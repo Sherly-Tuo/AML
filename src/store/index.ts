@@ -3,6 +3,7 @@ import type { StateStorage } from 'zustand/middleware';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { defaultDemandBids } from '../data/vic1DemandBids';
 import { defaultSupplyReports } from '../data/solarSupplyReports';
+import { toHourStartIso, toIsoString } from '../lib/datetime';
 import type { DemandBid, MarketReport, OptimizationRun } from '../types';
 
 interface NewMarketReport {
@@ -73,12 +74,6 @@ const safeStorage: StateStorage = {
 
 const createId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-const toHourStartIso = (value = new Date()) => {
-  const timestamp = new Date(value);
-  timestamp.setUTCMinutes(0, 0, 0);
-  return timestamp.toISOString();
-};
-
 const looksLikeLegacySampleSupplyDataset = (value: unknown): value is MarketReport[] =>
   Array.isArray(value) &&
   value.length === 8 &&
@@ -108,10 +103,7 @@ const normalizeDemandBid = (bid: NewDemandBid): DemandBid => ({
   buyerName: bid.buyerName.trim() || 'Demand participant',
   demandKwh: Number(bid.demandKwh.toFixed(2)),
   maxPricePerKwh: Number(bid.maxPricePerKwh.toFixed(3)),
-  requestedAt:
-    bid.requestedAt && !Number.isNaN(new Date(bid.requestedAt).getTime())
-      ? new Date(bid.requestedAt).toISOString()
-      : new Date().toISOString(),
+  requestedAt: toIsoString(bid.requestedAt, new Date().toISOString()) ?? new Date().toISOString(),
 });
 
 export const useStore = create<AppState>()(
@@ -129,7 +121,7 @@ export const useStore = create<AppState>()(
               reporterName: report.reporterName.trim(),
               surplusKwh: Number(report.surplusKwh.toFixed(2)),
               pricePerKwh: Number(report.pricePerKwh.toFixed(3)),
-              reportedAt: toHourStartIso(report.reportedAt ? new Date(report.reportedAt) : new Date()),
+              reportedAt: toHourStartIso(report.reportedAt ?? new Date(), new Date().toISOString()) ?? new Date().toISOString(),
             },
             ...state.marketReports,
           ],

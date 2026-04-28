@@ -7,6 +7,7 @@ import type {
   UserListingInput,
   WeatherHour,
 } from '../types';
+import { getTimestamp, toHourStartIso, toIsoString } from '../lib/datetime';
 
 interface MarketStats {
   reportCount: number;
@@ -188,7 +189,7 @@ const parseMarketTimestamp = (value: string) => {
       ? value
       : `${value}:00Z`
     : `${value.replace(' ', 'T')}Z`;
-  return Date.parse(normalized);
+  return getTimestamp(normalized) ?? Number.NaN;
 };
 
 const buildUtcParts = (timestamp: number) => {
@@ -219,9 +220,7 @@ const dotProduct = (left: number[], right: number[]) =>
   left.reduce((sum, value, index) => sum + value * (right[index] ?? 0), 0);
 
 const toHourKey = (timestamp: number) => {
-  const date = new Date(timestamp);
-  date.setUTCMinutes(0, 0, 0);
-  return date.toISOString();
+  return toHourStartIso(timestamp, new Date(0).toISOString()) ?? new Date(0).toISOString();
 };
 
 const weatherFeatureFallback: WeatherFeatureSet = {
@@ -1122,7 +1121,7 @@ export function calculateOptimizedPricing(
 ): PricingRecommendation {
   const cleanedReports = reports
     .filter((report) => report.surplusKwh > 0 && report.pricePerKwh > 0)
-    .sort((a, b) => new Date(b.reportedAt).getTime() - new Date(a.reportedAt).getTime());
+    .sort((a, b) => (getTimestamp(b.reportedAt) ?? 0) - (getTimestamp(a.reportedAt) ?? 0));
   const cleanedDemandBids = demandBids
     .filter((bid) => bid.demandKwh > 0 && bid.maxPricePerKwh > 0)
     .sort((a, b) => parseMarketTimestamp(a.requestedAt) - parseMarketTimestamp(b.requestedAt));
@@ -1272,7 +1271,7 @@ export function calculateOptimizedPricing(
     optimizedPrice <= demandPriceStats.p35 ? 'aggressive' : optimizedPrice <= demandPriceStats.p70 ? 'balanced' : 'premium';
   const fillExpectation =
     bestOutcome.fillProbability >= 0.75 ? 'fast' : bestOutcome.fillProbability >= 0.45 ? 'normal' : 'slow';
-  const listingIso = new Date(listingContext.timestamp).toISOString();
+  const listingIso = toIsoString(listingContext.timestamp, input.listingTime ?? '') ?? (input.listingTime ?? '');
   const supplyUncertaintyStd = round(standardDeviation(supplyResiduals), 3);
   const baselinePrediction = predictLinearDemand(demandModelBundle.baselineModel, listingContext, optimizedPrice);
   const randomForestPrediction = predictForestDemand(demandModelBundle.randomForestModel, listingContext, optimizedPrice);

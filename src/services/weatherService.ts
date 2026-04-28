@@ -1,4 +1,5 @@
 import type { DemandBid, MarketReport, WeatherHour } from '../types';
+import { getTimestamp, toHourStartIso, toIsoString } from '../lib/datetime';
 
 export const defaultWeatherLocation = {
   label: 'Melbourne, VIC',
@@ -52,13 +53,9 @@ const hourlyFields = [
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
-const toUtcIso = (value: string) => new Date(`${value}:00Z`).toISOString();
+const toUtcIso = (value: string) => toIsoString(`${value}:00Z`);
 
-const hourKey = (value: string) => {
-  const date = new Date(value);
-  date.setUTCMinutes(0, 0, 0);
-  return date.toISOString();
-};
+const hourKey = (value: string) => toHourStartIso(value);
 
 const toApiDate = (value: string) => value.slice(0, 10);
 
@@ -123,8 +120,8 @@ export const getHistoricalWeatherWindow = (marketReports: MarketReport[], demand
     return null;
   }
 
-  const marketTimes = marketReports.map((report) => Date.parse(report.reportedAt)).filter(Number.isFinite);
-  const demandTimes = demandBids.map((bid) => Date.parse(bid.requestedAt)).filter(Number.isFinite);
+  const marketTimes = marketReports.map((report) => getTimestamp(report.reportedAt)).filter((value): value is number => value !== null);
+  const demandTimes = demandBids.map((bid) => getTimestamp(bid.requestedAt)).filter((value): value is number => value !== null);
 
   if (marketTimes.length === 0 || demandTimes.length === 0) {
     return null;
@@ -165,18 +162,28 @@ export const fetchHistoricalWeather = async (window: HistoricalWeatherWindow) =>
     throw new Error('Historical weather API returned no hourly data.');
   }
 
-  return hourly.time.map<WeatherHour>((time, index) => ({
-    time: toUtcIso(time),
-    temperatureC: hourly.temperature_2m?.[index] ?? 0,
-    relativeHumidity: hourly.relative_humidity_2m?.[index] ?? 0,
-    precipitationMm: hourly.precipitation?.[index] ?? 0,
-    cloudCover: hourly.cloud_cover?.[index] ?? 0,
-    shortwaveRadiation: hourly.shortwave_radiation?.[index] ?? 0,
-    directNormalIrradiance: hourly.direct_normal_irradiance?.[index] ?? 0,
-    windSpeed10m: hourly.wind_speed_10m?.[index] ?? 0,
-    weatherCode: hourly.weather_code?.[index] ?? 0,
-    isDay: (hourly.is_day?.[index] ?? 0) === 1,
-  }));
+  return hourly.time
+    .map<WeatherHour | null>((time, index) => {
+      const normalizedTime = toUtcIso(time);
+
+      if (!normalizedTime) {
+        return null;
+      }
+
+      return {
+        time: normalizedTime,
+        temperatureC: hourly.temperature_2m?.[index] ?? 0,
+        relativeHumidity: hourly.relative_humidity_2m?.[index] ?? 0,
+        precipitationMm: hourly.precipitation?.[index] ?? 0,
+        cloudCover: hourly.cloud_cover?.[index] ?? 0,
+        shortwaveRadiation: hourly.shortwave_radiation?.[index] ?? 0,
+        directNormalIrradiance: hourly.direct_normal_irradiance?.[index] ?? 0,
+        windSpeed10m: hourly.wind_speed_10m?.[index] ?? 0,
+        weatherCode: hourly.weather_code?.[index] ?? 0,
+        isDay: (hourly.is_day?.[index] ?? 0) === 1,
+      };
+    })
+    .filter((hour): hour is WeatherHour => hour !== null);
 };
 
 export const alignHistoricalWeatherWithMarket = (
@@ -189,6 +196,9 @@ export const alignHistoricalWeatherWithMarket = (
 
   marketReports.forEach((report) => {
     const key = hourKey(report.reportedAt);
+    if (!key) {
+      return;
+    }
     const current = supplyByHour.get(key) ?? [];
     current.push(report);
     supplyByHour.set(key, current);
@@ -196,6 +206,9 @@ export const alignHistoricalWeatherWithMarket = (
 
   demandBids.forEach((bid) => {
     const key = hourKey(bid.requestedAt);
+    if (!key) {
+      return;
+    }
     const current = demandByHour.get(key) ?? [];
     current.push(bid);
     demandByHour.set(key, current);
@@ -204,6 +217,9 @@ export const alignHistoricalWeatherWithMarket = (
   return weatherHours
     .map<HistoricalAlignedHour | null>((weather) => {
       const key = hourKey(weather.time);
+      if (!key) {
+        return null;
+      }
       const supplyReports = supplyByHour.get(key) ?? [];
       const hourDemandBids = demandByHour.get(key) ?? [];
 
@@ -230,5 +246,5 @@ export const alignHistoricalWeatherWithMarket = (
       };
     })
     .filter((item): item is HistoricalAlignedHour => item !== null)
-    .sort((left, right) => new Date(right.time).getTime() - new Date(left.time).getTime());
+    .sort((left, right) => (getTimestamp(right.time) ?? 0) - (getTimestamp(left.time) ?? 0));
 };

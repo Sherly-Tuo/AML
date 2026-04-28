@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { defaultDemandDatasetMeta } from '@/data/vic1DemandBids';
 import { defaultSupplyDatasetMeta } from '@/data/solarSupplyReports';
 import { parseDemandDataset } from '@/lib/demandImport';
+import { formatDateTime, getTimestamp, parseDateTimeLocalToUtcIso } from '@/lib/datetime';
 import { calculateOptimizedPricing, getDemandStats, getMarketStats } from '@/services/aiService';
 import {
   alignHistoricalWeatherWithMarket,
@@ -35,7 +36,7 @@ const currency = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2,
 });
 
-const datetime = new Intl.DateTimeFormat('zh-CN', {
+const datetime = new Intl.DateTimeFormat('en-US', {
   month: '2-digit',
   day: '2-digit',
   hour: '2-digit',
@@ -46,7 +47,7 @@ const formatUnitPrice = (value: number) => value.toFixed(3);
 const formatCoverageRatio = (value: number) => `${value.toFixed(2)}x`;
 const formatListingTime = (value: string) => value.replace('T', ' ').slice(0, 16);
 const formatWeatherHour = (value: string) => value.slice(5, 16).replace('T', ' ');
-const toListingHourIso = (value: string) => new Date(`${value}:00Z`).toISOString();
+const toListingHourIso = (value: string) => parseDateTimeLocalToUtcIso(value, '');
 
 function Home() {
   const marketReports = useStore((state) => state.marketReports);
@@ -84,10 +85,10 @@ function Home() {
   const defaultDemandRange = `${defaultDemandDatasetMeta.startDate} to ${defaultDemandDatasetMeta.endDate}`;
   const defaultSupplyRange = `${defaultSupplyDatasetMeta.startDate} to ${defaultSupplyDatasetMeta.endDate}`;
   const displayedDemandBids = [...demandBids]
-    .sort((left, right) => new Date(right.requestedAt).getTime() - new Date(left.requestedAt).getTime())
+    .sort((left, right) => (getTimestamp(right.requestedAt) ?? 0) - (getTimestamp(left.requestedAt) ?? 0))
     .slice(0, 240);
   const displayedMarketReports = [...marketReports]
-    .sort((left, right) => new Date(right.reportedAt).getTime() - new Date(left.reportedAt).getTime())
+    .sort((left, right) => (getTimestamp(right.reportedAt) ?? 0) - (getTimestamp(left.reportedAt) ?? 0))
     .slice(0, 240);
   const historicalWindow = useMemo(() => getHistoricalWeatherWindow(marketReports, demandBids), [marketReports, demandBids]);
   const alignedHistoricalHours = useMemo(
@@ -226,6 +227,12 @@ function Home() {
     }
 
     const listingHourIso = toListingHourIso(listingTime);
+
+    if (!listingHourIso) {
+      setPricingError('Please choose a valid listing hour.');
+      return;
+    }
+
     const matchedWeatherContext =
       selectedHistoricalHour?.time === listingHourIso
         ? selectedHistoricalHour.weather
@@ -626,7 +633,7 @@ function Home() {
                       <span className="font-medium text-stone-950">{bid.buyerName}</span>
                       <span>{bid.demandKwh.toFixed(1)} kWh</span>
                       <span>{formatUnitPrice(bid.maxPricePerKwh)}/kWh</span>
-                      <span>{datetime.format(new Date(bid.requestedAt))}</span>
+                      <span>{formatDateTime(bid.requestedAt, datetime)}</span>
                       <button
                         type="button"
                         className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-stone-200 text-stone-500 transition hover:border-red-200 hover:text-red-600"
@@ -738,7 +745,7 @@ function Home() {
                     <span className="font-medium text-stone-950">{report.reporterName}</span>
                     <span>{report.surplusKwh.toFixed(1)} kWh</span>
                     <span>{formatUnitPrice(report.pricePerKwh)}/kWh</span>
-                    <span>{datetime.format(new Date(report.reportedAt))}</span>
+                    <span>{formatDateTime(report.reportedAt, datetime)}</span>
                     <button
                       type="button"
                       className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-stone-200 text-stone-500 transition hover:border-red-200 hover:text-red-600"
@@ -920,7 +927,7 @@ function Home() {
                     <span className="font-medium text-stone-950">{report.reporterName}</span>
                     <span>{report.surplusKwh.toFixed(1)} kWh</span>
                     <span>{formatUnitPrice(report.pricePerKwh)}/kWh</span>
-                    <span>{datetime.format(new Date(report.reportedAt))}</span>
+                    <span>{formatDateTime(report.reportedAt, datetime)}</span>
                   </div>
                 ))}
               </div>
@@ -953,7 +960,7 @@ function Home() {
                     <span className="font-medium text-stone-950">{bid.buyerName}</span>
                     <span>{bid.demandKwh.toFixed(1)} kWh</span>
                     <span>{formatUnitPrice(bid.maxPricePerKwh)}/kWh</span>
-                    <span>{datetime.format(new Date(bid.requestedAt))}</span>
+                    <span>{formatDateTime(bid.requestedAt, datetime)}</span>
                   </div>
                 ))}
               </div>
@@ -984,7 +991,7 @@ function Home() {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-base font-semibold text-stone-950">{run.surplusKwh.toFixed(1)} kWh</p>
-                      <p className="text-sm text-stone-600">{datetime.format(new Date(run.createdAt))}</p>
+                      <p className="text-sm text-stone-600">{formatDateTime(run.createdAt, datetime)}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-stone-500">Original price {formatUnitPrice(run.inputPrice)}/kWh</p>
