@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { StateStorage } from 'zustand/middleware';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { defaultDemandBids } from '../data/vic1DemandBids';
 import { defaultSupplyReports } from '../data/solarSupplyReports';
@@ -42,6 +43,33 @@ interface AppState {
 export const seedMarketReports: MarketReport[] = defaultSupplyReports;
 
 export const seedDemandBids: DemandBid[] = defaultDemandBids;
+
+const isSeedMarketReport = (report: MarketReport) => report.id.startsWith('solar-');
+const isSeedDemandBid = (bid: DemandBid) => bid.id.startsWith('vic1-');
+
+const safeStorage: StateStorage = {
+  getItem: (name) => {
+    try {
+      return localStorage.getItem(name);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (name, value) => {
+    try {
+      localStorage.setItem(name, value);
+    } catch {
+      // Ignore storage failures on constrained devices/browsers.
+    }
+  },
+  removeItem: (name) => {
+    try {
+      localStorage.removeItem(name);
+    } catch {
+      // Ignore storage failures on constrained devices/browsers.
+    }
+  },
+};
 
 const createId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -160,8 +188,24 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'voltshare-market-db',
-      version: 4,
-      storage: createJSONStorage(() => localStorage),
+      version: 5,
+      storage: createJSONStorage(() => safeStorage),
+      partialize: (state) => ({
+        marketReports: state.marketReports.filter((report) => !isSeedMarketReport(report)),
+        demandBids: state.demandBids.filter((bid) => !isSeedDemandBid(bid)),
+        optimizationHistory: state.optimizationHistory,
+      }),
+      merge: (persistedState, currentState) => {
+        const state = persistedState as Partial<AppState> | undefined;
+
+        return {
+          ...currentState,
+          ...state,
+          marketReports: [...(state?.marketReports ?? []), ...seedMarketReports],
+          demandBids: [...(state?.demandBids ?? []), ...seedDemandBids],
+          optimizationHistory: state?.optimizationHistory ?? [],
+        };
+      },
       migrate: (persistedState, version) => {
         const state = persistedState as Partial<AppState> | undefined;
 
@@ -192,6 +236,15 @@ export const useStore = create<AppState>()(
           return {
             ...state,
             marketReports: seedMarketReports,
+          };
+        }
+
+        if (version < 5) {
+          return {
+            ...state,
+            marketReports: (state.marketReports ?? []).filter((report) => !isSeedMarketReport(report as MarketReport)),
+            demandBids: (state.demandBids ?? []).filter((bid) => !isSeedDemandBid(bid as DemandBid)),
+            optimizationHistory: state.optimizationHistory ?? [],
           };
         }
 
