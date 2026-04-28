@@ -2,7 +2,8 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Home from "@/pages/Home";
 
 export default function App() {
-  const basename = new URL(document.baseURI).pathname;
+  const pathnameBase = new URL(document.baseURI).pathname.replace(/\/$/, "");
+  const basename = pathnameBase.length > 0 ? pathnameBase : "/";
 
   return (
     <Router basename={basename}>
