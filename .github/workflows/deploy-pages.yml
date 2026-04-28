@@ -31,6 +31,8 @@ jobs:
         run: npm ci
 
       - name: Build
+        env:
+          VITE_BASE_PATH: /AML/
         run: npm run build
 
       - name: Setup Pages

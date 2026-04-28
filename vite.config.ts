@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig({
-  base: '/AML/',
+  base: process.env.VITE_BASE_PATH ?? '/',
   plugins: [react(), tsconfigPaths()],
   server: {
     port: 4173,
