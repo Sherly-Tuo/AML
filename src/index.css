@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #1c1917;
+  background:
+    radial-gradient(circle at top left, rgba(246, 199, 112, 0.28), transparent 34%),
+    radial-gradient(circle at 82% 18%, rgba(82, 140, 121, 0.18), transparent 24%),
+    linear-gradient(180deg, #f7f2e6 0%, #efe6d3 48%, #e9dfcd 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  color: #1c1917;
+  background: transparent;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::selection {
+  background: rgba(180, 83, 9, 0.18);
+  color: #1c1917;
+}
+
+@layer components {
+  .hero-panel {
+    @apply rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.9),rgba(255,248,235,0.82))] p-6 shadow-[0_24px_90px_rgba(109,84,35,0.12)] sm:p-8 lg:p-10;
+    backdrop-filter: blur(16px);
+  }
+
+  .panel {
+    @apply rounded-[2rem] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.84),rgba(248,243,232,0.72))] p-6 shadow-[0_18px_54px_rgba(109,84,35,0.10)] sm:p-7;
+    backdrop-filter: blur(14px);
+  }
+
+  .eyebrow {
+    @apply text-xs font-medium uppercase tracking-[0.28em] text-stone-500;
+  }
+
+  .chip {
+    @apply inline-flex items-center rounded-full border border-stone-300/80 bg-white/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-stone-700;
+  }
+
+  .data-tag {
+    @apply rounded-full border border-stone-300/70 bg-white/85 px-2.5 py-1;
+  }
+
+  .kpi-value {
+    @apply text-3xl font-semibold tracking-tight text-stone-950 sm:text-[2rem];
+  }
+
+  .field-block {
+    @apply flex flex-col gap-2;
+  }
+
+  .field-label {
+    @apply text-xs font-medium uppercase tracking-[0.16em] text-stone-500;
+  }
+
+  .input-control {
+    @apply h-12 rounded-2xl border border-stone-200 bg-stone-50/80 px-4 text-sm text-stone-900 outline-none transition focus:border-amber-500 focus:bg-white focus:ring-2 focus:ring-amber-100;
+  }
+
+  .primary-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-stone-950 px-5 py-3 text-sm font-medium text-stone-50 transition hover:bg-stone-800;
+  }
+
+  .secondary-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-stone-300 bg-white/80 px-4 py-2.5 text-sm font-medium text-stone-700 transition hover:border-stone-400 hover:bg-white;
+  }
+}
