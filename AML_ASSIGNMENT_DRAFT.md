@@ -189,6 +189,21 @@ This suggests that the relationship between demand, price, and temporal context 
 
 In practical terms, this makes the Random Forest a stronger candidate for the downstream pricing recommendation stage.
 
+### 8.2 Weather Ablation
+
+I also compared the demand model with and without weather features.
+
+| Model | RMSE | MAE | R² |
+| --- | --- | --- | --- |
+| Random Forest (no weather) | 0.2892 | 0.1798 | 0.9272 |
+| Random Forest (with weather) | 0.2933 | 0.1822 | 0.9251 |
+
+In the current setup, adding weather features did **not** improve the Random Forest test metrics.
+
+This is still a meaningful AML result. It suggests that the current lag and time-based demand features already explain a large share of the predictive structure, while the current weather proxy remains relatively coarse.
+
+A likely reason is that the weather signal is based on a single representative Melbourne location, while the demand label is regional (`VIC1`). In future work, weather may become more useful if it is aggregated across multiple locations or matched to more localized participant-level data.
+
 ## 9. Current System Output
 
 The system outputs:

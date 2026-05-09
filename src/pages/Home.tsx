@@ -2,6 +2,7 @@ import {
   BarChart3,
   CloudSun,
   Database,
+  LogOut,
   LoaderCircle,
   RefreshCcw,
   Sparkles,
@@ -10,8 +11,11 @@ import {
   Upload,
   Wallet,
 } from 'lucide-react';
+import { MarketTimeline } from '@/components/Charts';
 import type { ChangeEvent, ComponentType, FormEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '@/auth/AuthProvider';
 import { defaultDemandDatasetMeta } from '@/data/vic1DemandBids';
 import { defaultSupplyDatasetMeta } from '@/data/solarSupplyReports';
 import { parseDemandDataset } from '@/lib/demandImport';
@@ -50,6 +54,7 @@ const formatWeatherHour = (value: string) => value.slice(5, 16).replace('T', ' '
 const toListingHourIso = (value: string) => parseDateTimeLocalToUtcIso(value, '');
 
 function Home() {
+  const { hasSupabaseConfig, loading: authLoading, user, profile, signOut } = useAuth();
   const marketReports = useStore((state) => state.marketReports);
   const demandBids = useStore((state) => state.demandBids);
   const optimizationHistory = useStore((state) => state.optimizationHistory);
@@ -79,6 +84,7 @@ function Home() {
   const [selectedHistoricalTime, setSelectedHistoricalTime] = useState('');
   const [weatherStatus, setWeatherStatus] = useState('Aligning 2025 historical weather with supply and demand...');
   const [weatherError, setWeatherError] = useState('');
+  const [authError, setAuthError] = useState('');
 
   const marketStats = getMarketStats(marketReports);
   const demandStats = getDemandStats(demandBids);
@@ -97,6 +103,19 @@ function Home() {
   );
   const selectedHistoricalHour =
     alignedHistoricalHours.find((hour) => hour.time === selectedHistoricalTime) ?? alignedHistoricalHours[0] ?? null;
+
+  const timelineData = useMemo(
+    () =>
+      alignedHistoricalHours.slice(0, 96).map((h) => ({
+        label: h.time.slice(5, 13).replace('T', ' '),
+        supply: h.totalSupplyKwh,
+        demand: h.totalDemandKwh,
+        supplyPrice: h.averageSupplyPrice,
+        demandBid: h.weightedDemandBid,
+      })),
+    [alignedHistoricalHours],
+  );
+
   const presentationHour = useMemo(
     () =>
       [...alignedHistoricalHours].sort((left, right) => {
@@ -299,9 +318,74 @@ function Home() {
     setPricingError('');
   };
 
+  const handleSignOut = async () => {
+    setAuthError('');
+
+    try {
+      await signOut();
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Could not sign out right now.');
+    }
+  };
+
   return (
     <main className="min-h-screen px-4 pb-20 pt-6 sm:px-6 lg:px-10">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        <section className="panel">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-2">
+              <p className="eyebrow">Account Status</p>
+              <h2 className="text-2xl font-semibold tracking-tight text-stone-950">Sign in to save your pricing runs.</h2>
+              <p className="max-w-3xl text-sm leading-7 text-stone-600">
+                You can explore the dashboard as a guest. Signing in adds the next layer: your own profile, saved recommendation history, and a path toward postcode-aware energy sharing later.
+              </p>
+            </div>
+
+            <div className="rounded-[1.5rem] border border-stone-200 bg-white/80 px-5 py-4 shadow-[0_12px_30px_rgba(109,84,35,0.08)]">
+              <div className="flex min-w-[280px] flex-col gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="chip">
+                    {authLoading ? 'Checking session...' : user ? 'Signed in' : 'Browsing as guest'}
+                  </span>
+                  {hasSupabaseConfig ? (
+                    <span className="text-xs uppercase tracking-[0.16em] text-emerald-700">Email login enabled</span>
+                  ) : (
+                    <span className="text-xs uppercase tracking-[0.16em] text-amber-700">Setup incomplete</span>
+                  )}
+                </div>
+
+                {user ? (
+                  <>
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium text-stone-900">{profile?.display_name || user.email || 'Signed-in user'}</div>
+                      <div className="text-sm text-stone-600">{profile?.email || user.email}</div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" className="secondary-btn" onClick={handleSignOut}>
+                        <LogOut className="h-4 w-4" />
+                        Sign out
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm leading-6 text-stone-600">
+                      Sign in with email if you want this app to remember your runs and attach them to your own account later.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Link className="primary-btn" to="/auth">
+                        Sign in with email
+                      </Link>
+                    </div>
+                  </>
+                )}
+
+                {authError ? <p className="text-sm text-rose-700">{authError}</p> : null}
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="hero-panel">
           <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
             <div className="space-y-5">
@@ -415,6 +499,16 @@ function Home() {
               Reload Historical Weather
             </button>
           </div>
+
+          {timelineData.length > 0 && (
+            <div className="rounded-[1.75rem] border border-stone-200/70 bg-white/85 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-stone-400">Solar supply vs demand — aligned hourly window</p>
+              <p className="mt-1 text-sm text-stone-500">First 96 hours of the aligned dataset. Supply peaks show solar generation windows; demand peaks show when buyers need energy most.</p>
+              <div className="mt-4">
+                <MarketTimeline data={timelineData} />
+              </div>
+            </div>
+          )}
 
           <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
             <div className="space-y-4">

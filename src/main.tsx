@@ -1,6 +1,7 @@
 import { Component, StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { AuthProvider } from '@/auth/AuthProvider';
 import './index.css';
 
 class RootErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; message: string }> {
@@ -36,7 +37,9 @@ class RootErrorBoundary extends Component<{ children: ReactNode }, { hasError: b
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <RootErrorBoundary>
-      <App />
+      <AuthProvider>
+        <App />
+      </AuthProvider>
     </RootErrorBoundary>
   </StrictMode>,
 );

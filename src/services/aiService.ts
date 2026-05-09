@@ -41,10 +41,14 @@ interface DemandObservation {
   monthCos: number;
   lagDemand1: number;
   lagDemand24: number;
+  lagDemand168: number;
   lagPrice1: number;
   lagPrice24: number;
+  lagPrice168: number;
   rollingDemand24: number;
+  rollingDemand168: number;
   rollingPrice24: number;
+  rollingPrice168: number;
   temperatureC: number;
   cloudCover: number;
   precipitationMm: number;
@@ -103,10 +107,14 @@ interface ScenarioContext {
   monthCos: number;
   lagDemand1: number;
   lagDemand24: number;
+  lagDemand168: number;
   lagPrice1: number;
   lagPrice24: number;
+  lagPrice168: number;
   rollingDemand24: number;
+  rollingDemand168: number;
   rollingPrice24: number;
+  rollingPrice168: number;
   temperatureC: number;
   cloudCover: number;
   precipitationMm: number;
@@ -417,8 +425,10 @@ const buildBaselineFeatureVector = (context: ScenarioContext, pricePerKwh: numbe
     context.isWeekend,
     context.lagDemand1,
     context.lagDemand24,
+    context.lagDemand168,
     context.lagPrice1,
     context.lagPrice24,
+    context.lagPrice168,
     context.temperatureC / 40,
     context.cloudCover / 100,
     context.precipitationMm / 10,
@@ -454,10 +464,14 @@ const buildForestFeatureVector = (context: ScenarioContext, pricePerKwh: number)
     context.monthCos,
     context.lagDemand1,
     context.lagDemand24,
+    context.lagDemand168,
     context.lagPrice1,
     context.lagPrice24,
+    context.lagPrice168,
     context.rollingDemand24,
+    context.rollingDemand168,
     context.rollingPrice24,
+    context.rollingPrice168,
     context.temperatureC,
     context.cloudCover,
     context.precipitationMm,
@@ -470,8 +484,13 @@ const buildForestFeatureVector = (context: ScenarioContext, pricePerKwh: number)
     logPrice * (context.cloudCover / 100),
     logPrice * (context.shortwaveRadiation / 1000),
     context.lagDemand1 - context.lagDemand24,
+    context.lagDemand1 - context.lagDemand168,
     context.lagPrice1 - context.lagPrice24,
+    context.lagPrice1 - context.lagPrice168,
     context.rollingDemand24 - context.lagDemand24,
+    context.rollingDemand168 - context.lagDemand168,
+    context.rollingPrice24 - context.lagPrice24,
+    context.rollingPrice168 - context.lagPrice168,
   ];
 };
 
@@ -573,8 +592,8 @@ const buildDecisionTree = (
 
 const trainRandomForest = (features: number[][], targets: number[]) => {
   const random = createSeededRandom(20260427);
-  const treeCount = 18;
-  const sampleSize = Math.min(features.length, 1800);
+  const treeCount = 32;
+  const sampleSize = Math.min(features.length, 2600);
   const trees: TreeNode[] = [];
 
   for (let treeIndex = 0; treeIndex < treeCount; treeIndex += 1) {
@@ -635,9 +654,12 @@ const buildDemandObservations = (bids: DemandBid[], weatherLookup: Map<string, W
     const previousRow = index > 0 ? baseRows[index - 1] : row;
     const previousHour = baseMap.get(row.timestamp - HOUR_MS) ?? previousRow;
     const previousDay = baseMap.get(row.timestamp - DAY_MS) ?? baseRows[Math.max(0, index - 24)] ?? previousHour;
+    const previousWeek = baseMap.get(row.timestamp - DAY_MS * 7) ?? baseRows[Math.max(0, index - 168)] ?? previousDay;
     const timeParts = buildUtcParts(row.timestamp);
     const rollingDemand24 = demandWindow.length > 0 ? mean(demandWindow) : row.demandKwh;
     const rollingPrice24 = priceWindow.length > 0 ? mean(priceWindow) : row.pricePerKwh;
+    const rollingDemand168 = demandWindow.length > 0 ? mean(demandWindow.slice(-168)) : row.demandKwh;
+    const rollingPrice168 = priceWindow.length > 0 ? mean(priceWindow.slice(-168)) : row.pricePerKwh;
     const weather = resolveWeatherFeatures(row.timestamp, weatherLookup);
 
     observations.push({
@@ -648,10 +670,14 @@ const buildDemandObservations = (bids: DemandBid[], weatherLookup: Map<string, W
       ...timeParts,
       lagDemand1: previousHour.demandKwh,
       lagDemand24: previousDay.demandKwh,
+      lagDemand168: previousWeek.demandKwh,
       lagPrice1: previousHour.pricePerKwh,
       lagPrice24: previousDay.pricePerKwh,
+      lagPrice168: previousWeek.pricePerKwh,
       rollingDemand24,
+      rollingDemand168,
       rollingPrice24,
+      rollingPrice168,
       temperatureC: weather.temperatureC,
       cloudCover: weather.cloudCover,
       precipitationMm: weather.precipitationMm,
@@ -686,7 +712,7 @@ const buildDemandObservations = (bids: DemandBid[], weatherLookup: Map<string, W
 
     demandWindow.push(row.demandKwh);
     priceWindow.push(row.pricePerKwh);
-    if (demandWindow.length > 24) {
+    if (demandWindow.length > 168) {
       demandWindow.shift();
       priceWindow.shift();
     }
@@ -841,10 +867,14 @@ const buildScenarioContext = (bundle: DemandModelBundle, listingTime?: string, w
     ...timeParts,
     lagDemand1: previousHour?.demandKwh ?? hourDefaults.demand,
     lagDemand24: previousDay?.demandKwh ?? previousHour?.demandKwh ?? hourDefaults.demand,
+    lagDemand168: bundle.observationMap.get(timestamp - DAY_MS * 7)?.demandKwh ?? previousDay?.demandKwh ?? previousHour?.demandKwh ?? hourDefaults.demand,
     lagPrice1: previousHour?.pricePerKwh ?? hourDefaults.price,
     lagPrice24: previousDay?.pricePerKwh ?? previousHour?.pricePerKwh ?? hourDefaults.price,
+    lagPrice168: bundle.observationMap.get(timestamp - DAY_MS * 7)?.pricePerKwh ?? previousDay?.pricePerKwh ?? previousHour?.pricePerKwh ?? hourDefaults.price,
     rollingDemand24: anchor?.rollingDemand24 ?? hourDefaults.demand,
+    rollingDemand168: anchor?.rollingDemand168 ?? anchor?.rollingDemand24 ?? hourDefaults.demand,
     rollingPrice24: anchor?.rollingPrice24 ?? hourDefaults.price,
+    rollingPrice168: anchor?.rollingPrice168 ?? anchor?.rollingPrice24 ?? hourDefaults.price,
     temperatureC: weather.temperatureC,
     cloudCover: weather.cloudCover,
     precipitationMm: weather.precipitationMm,
@@ -1168,6 +1198,7 @@ export function calculateOptimizedPricing(
         'There is currently no demand-side history available to train the OLS or Random Forest demand model.',
         'The system therefore falls back to your input price. To enable machine-learning-based pricing, keep or import demand-side data.',
       ],
+      priceCurve: [],
     };
   }
 
@@ -1232,6 +1263,7 @@ export function calculateOptimizedPricing(
 
   let bestPrice = input.targetPrice;
   let bestOutcome = currentOutcome;
+  const gridOutcomes: { price: number; revenue: number; demand: number }[] = [];
 
   for (const candidatePrice of priceGrid) {
     const outcome = simulatePriceOutcome({
@@ -1246,6 +1278,12 @@ export function calculateOptimizedPricing(
       retailTariff,
       weatherDemandMultiplier,
       weatherSupplyAdjustment,
+    });
+
+    gridOutcomes.push({
+      price: round(candidatePrice, 3),
+      revenue: round(outcome.expectedProfit, 4),
+      demand: round(outcome.expectedDemand, 3),
     });
 
     if (outcome.expectedProfit > bestOutcome.expectedProfit) {
@@ -1324,5 +1362,6 @@ export function calculateOptimizedPricing(
       `Supply-side uncertainty is estimated from historical same-hour solar surplus samples. There are currently ${supplyReferenceReports.length} effective references, with a residual standard deviation of about ${supplyUncertaintyStd.toFixed(3)} kWh.`,
       direction,
     ],
+    priceCurve: gridOutcomes.sort((a, b) => a.price - b.price),
   };
 }

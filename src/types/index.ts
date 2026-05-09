@@ -80,6 +80,7 @@ export interface PricingRecommendation {
   weatherAdjustedDemandMultiplier: number;
   weatherAdjustedSupplyAdjustment: number;
   explanation: string[];
+  priceCurve: { price: number; revenue: number; demand: number }[];
 }
 
 export interface OptimizationRun {
@@ -89,4 +90,14 @@ export interface OptimizationRun {
   optimizedPrice: number;
   expectedRevenue: number;
   createdAt: string;
+}
+
+export interface Purchase {
+  id: string;
+  sellerNeighborhood: string;
+  source: string;
+  kwhBought: number;
+  pricePerKwh: number;
+  totalCost: number;
+  boughtAt: string;
 }

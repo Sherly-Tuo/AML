@@ -24,6 +24,81 @@ It is a **prediction + optimization** system:
 3. Align weather and supply context by hour
 4. Search over candidate prices and return an optimized listing price
 
+## Supabase auth setup
+
+The first full-stack step adds Supabase email login around the existing dashboard.
+
+### 1. Frontend environment
+
+Copy `.env.example` to `.env.local` and fill in:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+### 2. Redirect URL
+
+In the Supabase dashboard, add your app URL to Auth redirect URLs. For local development that is usually:
+
+- `http://localhost:4173/auth`
+- `http://127.0.0.1:4173/auth`
+
+If you deploy the app, also add the deployed `/auth` URL.
+
+### 3. Profiles table
+
+Run this SQL in Supabase:
+
+```sql
+create table if not exists public.profiles (
+  id uuid primary key references auth.users (id) on delete cascade,
+  email text,
+  display_name text,
+  postcode text,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.profiles enable row level security;
+
+create policy "Users can read their own profile"
+on public.profiles
+for select
+using (auth.uid() = id);
+
+create policy "Users can insert their own profile"
+on public.profiles
+for insert
+with check (auth.uid() = id);
+
+create policy "Users can update their own profile"
+on public.profiles
+for update
+using (auth.uid() = id);
+```
+
+The current frontend auth flow will upsert a profile row after sign-in, so this table is enough for the first login milestone.
+
+## Supabase database plan
+
+To move VoltShare from a local demo toward a maintained app, the recommended Supabase schema now includes:
+
+- `profiles`
+- `demand_bids`
+- `supply_reports`
+- `recommendation_runs`
+- `data_update_runs`
+
+Files:
+
+- SQL schema: [supabase/voltshare_schema.sql](/Users/sherly/Downloads/dashboard/supabase/voltshare_schema.sql:1)
+- Monthly update workflow: [docs/monthly-data-update-plan.md](/Users/sherly/Downloads/dashboard/docs/monthly-data-update-plan.md:1)
+
+This design supports:
+
+- user identity and login
+- persistent marketplace reference data
+- saved pricing recommendation history
+- a visible monthly data update process that can be shown to a professor or stakeholder
+
 ## Data sources
 
 ### Demand-side data

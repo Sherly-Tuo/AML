@@ -4,7 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { defaultDemandBids } from '../data/vic1DemandBids';
 import { defaultSupplyReports } from '../data/solarSupplyReports';
 import { toHourStartIso, toIsoString } from '../lib/datetime';
-import type { DemandBid, MarketReport, OptimizationRun } from '../types';
+import type { DemandBid, MarketReport, OptimizationRun, Purchase } from '../types';
 
 interface NewMarketReport {
   reporterName: string;
@@ -27,10 +27,18 @@ interface NewDemandBid {
   requestedAt?: string;
 }
 
+interface NewPurchase {
+  sellerNeighborhood: string;
+  source: string;
+  kwhBought: number;
+  pricePerKwh: number;
+}
+
 interface AppState {
   marketReports: MarketReport[];
   demandBids: DemandBid[];
   optimizationHistory: OptimizationRun[];
+  purchases: Purchase[];
   addMarketReport: (report: NewMarketReport) => void;
   removeMarketReport: (id: string) => void;
   resetMarketReports: () => void;
@@ -39,6 +47,8 @@ interface AppState {
   resetDemandBids: () => void;
   saveOptimizationRun: (run: NewOptimizationRun) => void;
   clearOptimizationHistory: () => void;
+  addPurchase: (p: NewPurchase) => void;
+  clearPurchases: () => void;
 }
 
 export const seedMarketReports: MarketReport[] = defaultSupplyReports;
@@ -112,6 +122,7 @@ export const useStore = create<AppState>()(
       marketReports: seedMarketReports,
       demandBids: seedDemandBids,
       optimizationHistory: [],
+      purchases: [],
 
       addMarketReport: (report) =>
         set((state) => ({
@@ -174,18 +185,35 @@ export const useStore = create<AppState>()(
         })),
 
       clearOptimizationHistory: () =>
-        set({
-          optimizationHistory: [],
-        }),
+        set({ optimizationHistory: [] }),
+
+      addPurchase: (p) =>
+        set((state) => ({
+          purchases: [
+            {
+              id: createId('buy'),
+              sellerNeighborhood: p.sellerNeighborhood,
+              source: p.source,
+              kwhBought: Number(p.kwhBought.toFixed(2)),
+              pricePerKwh: Number(p.pricePerKwh.toFixed(3)),
+              totalCost: Number((p.kwhBought * p.pricePerKwh).toFixed(2)),
+              boughtAt: new Date().toISOString(),
+            },
+            ...state.purchases,
+          ].slice(0, 20),
+        })),
+
+      clearPurchases: () => set({ purchases: [] }),
     }),
     {
       name: 'voltshare-market-db',
-      version: 5,
+      version: 6,
       storage: createJSONStorage(() => safeStorage),
       partialize: (state) => ({
         marketReports: state.marketReports.filter((report) => !isSeedMarketReport(report)),
         demandBids: state.demandBids.filter((bid) => !isSeedDemandBid(bid)),
         optimizationHistory: state.optimizationHistory,
+        purchases: state.purchases,
       }),
       merge: (persistedState, currentState) => {
         const state = persistedState as Partial<AppState> | undefined;
@@ -196,6 +224,7 @@ export const useStore = create<AppState>()(
           marketReports: [...(state?.marketReports ?? []), ...seedMarketReports],
           demandBids: [...(state?.demandBids ?? []), ...seedDemandBids],
           optimizationHistory: state?.optimizationHistory ?? [],
+          purchases: state?.purchases ?? [],
         };
       },
       migrate: (persistedState, version) => {
@@ -206,6 +235,7 @@ export const useStore = create<AppState>()(
             marketReports: seedMarketReports,
             demandBids: seedDemandBids,
             optimizationHistory: [],
+            purchases: [],
           };
         }
 
