@@ -158,23 +158,10 @@ export default function AnalyticsDashboard() {
           </Link>
         </div>
 
-        <section className="panel space-y-5">
-          <div>
-            <p className="eyebrow">Part 0</p>
-            <h2 className="text-3xl font-semibold tracking-tight text-stone-950">Introduction</h2>
-          </div>
-          <div className="rounded-[1.75rem] border border-stone-200/70 bg-white/88 p-6 shadow-[0_10px_28px_rgba(109,84,35,0.06)]">
-            <p className="text-sm leading-8 text-stone-700 sm:text-[15px]">
-              Solar energy and decentralized clean-energy trading are becoming increasingly important as future power systems shift away from centralized fossil-fuel dependence and toward more distributed renewable supply. Yet traditional electricity allocation remains relatively inflexible: small-scale households can produce excess solar generation, but often have limited ability to price, trade, or reallocate that energy efficiently within their local communities. This project addresses that gap by asking how applied machine learning can support smarter local energy exchange. VoltShare uses historical demand-side and supply-side data, hourly weather context, and predictive pricing logic to recommend a listing price for surplus renewable energy. The AML component combines an interpretable OLS baseline with a Random Forest comparison model, then evaluates candidate prices through an expected-revenue optimization step. In parallel, we built a full-stack web application to simulate how these model outputs could function inside a real user-facing marketplace. The result is both an academic AML exercise and a product prototype at the intersection of climate technology, data science, and digital market design.
-            </p>
-          </div>
-        </section>
-
         <section className="hero-panel">
           <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
             <div className="space-y-5">
               <div className="space-y-3">
-                <p className="eyebrow">Part 1</p>
                 <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-stone-950 sm:text-5xl">
                   Algorithm Explanation
                 </h1>
@@ -226,6 +213,18 @@ export default function AnalyticsDashboard() {
                 source="Used to add solar availability and demand-pressure context"
               />
             </div>
+          </div>
+        </section>
+
+        <section className="panel space-y-5">
+          <div>
+            <p className="eyebrow">Part 0</p>
+            <h2 className="text-3xl font-semibold tracking-tight text-stone-950">Introduction</h2>
+          </div>
+          <div className="rounded-[1.75rem] border border-stone-200/70 bg-white/88 p-6 shadow-[0_10px_28px_rgba(109,84,35,0.06)]">
+            <p className="text-sm leading-8 text-stone-700 sm:text-[15px]">
+              Solar energy and decentralized clean-energy trading are becoming increasingly important as future power systems shift away from centralized fossil-fuel dependence and toward more distributed renewable supply. Yet traditional electricity allocation remains relatively inflexible: small-scale households can produce excess solar generation, but often have limited ability to price, trade, or reallocate that energy efficiently within their local communities. This project addresses that gap by asking how applied machine learning can support smarter local energy exchange. VoltShare uses historical demand-side and supply-side data, hourly weather context, and predictive pricing logic to recommend a listing price for surplus renewable energy. The AML component combines an interpretable OLS baseline with a Random Forest comparison model, then evaluates candidate prices through an expected-revenue optimization step. In parallel, we built a full-stack web application to simulate how these model outputs could function inside a real user-facing marketplace. The result is both an academic AML exercise and a product prototype at the intersection of climate technology, data science, and digital market design.
+            </p>
           </div>
         </section>
 
