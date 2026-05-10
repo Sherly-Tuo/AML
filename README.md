@@ -2,6 +2,11 @@
 
 VoltShare is an AML classroom project for **household solar listing price recommendation**.
 
+If another teammate is continuing development, start with:
+
+- [HANDOFF.md](/Users/sherly/Downloads/dashboard/HANDOFF.md:1)
+- [CLAUDE.md](/Users/sherly/Downloads/dashboard/CLAUDE.md:1)
+
 The system combines:
 
 - historical VIC1 demand-side data
