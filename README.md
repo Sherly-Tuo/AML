@@ -85,6 +85,9 @@ To move VoltShare from a local demo toward a maintained app, the recommended Sup
 - `demand_bids`
 - `supply_reports`
 - `recommendation_runs`
+- `listings`
+- `transactions`
+- `purchases`
 - `data_update_runs`
 
 Files:
@@ -97,7 +100,50 @@ This design supports:
 - user identity and login
 - persistent marketplace reference data
 - saved pricing recommendation history
+- live seller listings that other users can browse
+- buyer/seller transaction history for product analysis
 - a visible monthly data update process that can be shown to a professor or stakeholder
+
+### New marketplace tables
+
+#### `listings`
+
+This table is the live marketplace layer.
+
+Each row represents one user-created energy listing, for example:
+
+- seller account ID
+- surplus kWh
+- listing price per kWh
+- source type
+- postcode / suburb
+- status such as `active`, `sold`, or `cancelled`
+
+This is the table that will let:
+
+- user A publish a listing in `Sell`
+- user B read it later in `Buy`
+
+#### `transactions`
+
+This table records a completed or pending trade between two users.
+
+Each row stores:
+
+- `listing_id`
+- `buyer_user_id`
+- `seller_user_id`
+- traded kWh
+- agreed price
+- total amount
+- transaction status
+
+This is the table that will let the backend team analyze:
+
+- how many listings convert into purchases
+- which prices clear faster
+- which neighborhoods trade more often
+- buyer vs seller behavior
 
 ## Data sources
 

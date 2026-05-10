@@ -15,6 +15,7 @@ type UserProfile = {
   display_name: string | null;
   postcode: string | null;
   onboarded_at: string | null;
+  avatar_url: string | null;
 };
 
 type AuthContextValue = {
@@ -24,10 +25,12 @@ type AuthContextValue = {
   user: User | null;
   profile: UserProfile | null;
   isFirstTime: boolean;
-  requestMagicLink: (email: string) => Promise<{ error: string | null }>;
-  requestPhoneOtp: (phone: string) => Promise<{ error: string | null }>;
-  verifyPhoneOtp: (phone: string, token: string) => Promise<{ error: string | null }>;
+  signUpWithPassword: (input: { email: string; password: string; displayName: string }) => Promise<{ error: string | null }>;
+  signInWithPassword: (input: { email: string; password: string }) => Promise<{ error: string | null }>;
+  requestPasswordReset: (email: string) => Promise<{ error: string | null }>;
+  updatePassword: (password: string) => Promise<{ error: string | null }>;
   markOnboarded: () => Promise<void>;
+  updateProfile: (patch: Partial<Pick<UserProfile, 'display_name' | 'postcode' | 'avatar_url'>>) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 };
 
@@ -44,8 +47,14 @@ const mapProfile = (row: Record<string, unknown> | null): UserProfile | null => 
     display_name: typeof row.display_name === 'string' ? row.display_name : null,
     postcode: typeof row.postcode === 'string' ? row.postcode : null,
     onboarded_at: typeof row.onboarded_at === 'string' ? row.onboarded_at : null,
+    avatar_url: typeof row.avatar_url === 'string' ? row.avatar_url : null,
   };
 };
+
+const getUserMetaProfile = (user: User | null) => ({
+  display_name: typeof user?.user_metadata?.display_name === 'string' ? user.user_metadata.display_name : null,
+  avatar_url: typeof user?.user_metadata?.avatar_url === 'string' ? user.user_metadata.avatar_url : null,
+});
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -111,14 +120,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const syncProfile = async () => {
       const email = user.email ?? null;
-      const displayName =
-        typeof user.user_metadata?.display_name === 'string' ? user.user_metadata.display_name : null;
+      const metaProfile = getUserMetaProfile(user);
+      const displayName = metaProfile.display_name;
 
       const { error: upsertError } = await client.from('profiles').upsert(
         {
           id: user.id,
           email,
           display_name: displayName,
+          avatar_url: metaProfile.avatar_url,
         },
         { onConflict: 'id' },
       );
@@ -129,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { data, error } = await client
         .from('profiles')
-        .select('id, email, display_name, postcode, onboarded_at')
+        .select('id, email, display_name, postcode, onboarded_at, avatar_url')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -145,18 +155,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           display_name: displayName,
           postcode: null,
           onboarded_at: null,
+          avatar_url: null,
         });
         return;
       }
 
+      const fallbackProfile = {
+        id: user.id,
+        email,
+        display_name: displayName,
+        postcode: null,
+        onboarded_at: null,
+        avatar_url: metaProfile.avatar_url,
+      };
+
+      const mapped = mapProfile(data);
       setProfile(
-        mapProfile(data) ?? {
-          id: user.id,
-          email,
-          display_name: displayName,
-          postcode: null,
-          onboarded_at: null,
-        },
+        mapped
+          ? {
+              ...mapped,
+              display_name: mapped.display_name ?? metaProfile.display_name,
+              avatar_url: mapped.avatar_url ?? metaProfile.avatar_url,
+            }
+          : fallbackProfile,
       );
     };
 
@@ -181,33 +202,89 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await supabase.from('profiles').update({ onboarded_at: now }).eq('id', user.id);
         setProfile((prev) => (prev ? { ...prev, onboarded_at: now } : prev));
       },
-      requestMagicLink: async (email: string) => {
+      updateProfile: async (patch) => {
+        if (!supabase || !user) {
+          return { error: 'Supabase is not configured.' };
+        }
+
+        const metadataPatch: Record<string, string> = {};
+        if (typeof patch.display_name === 'string') {
+          metadataPatch.display_name = patch.display_name;
+        }
+        if (typeof patch.avatar_url === 'string') {
+          metadataPatch.avatar_url = patch.avatar_url;
+        }
+
+        if (Object.keys(metadataPatch).length > 0) {
+          const { error: userError } = await supabase.auth.updateUser({
+            data: metadataPatch,
+          });
+
+          if (userError) {
+            return { error: userError.message };
+          }
+        }
+
+        const { error } = await supabase.from('profiles').update(patch).eq('id', user.id);
+
+        if (error) {
+          if (error.message.includes('updated_at')) {
+            setProfile((prev) => (prev ? { ...prev, ...patch } : prev));
+            return { error: null };
+          }
+          return { error: error.message };
+        }
+
+        setProfile((prev) => (prev ? { ...prev, ...patch } : prev));
+        return { error: null };
+      },
+      signUpWithPassword: async ({ email, password, displayName }) => {
         if (!supabase) {
           return { error: 'Supabase is not configured yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.' };
         }
 
-        const redirectTo = new URL(import.meta.env.BASE_URL, window.location.origin);
-        const { error } = await supabase.auth.signInWithOtp({
+        const { error } = await supabase.auth.signUp({
           email,
+          password,
           options: {
-            emailRedirectTo: `${redirectTo.origin}${redirectTo.pathname}auth`,
+            data: {
+              display_name: displayName,
+            },
           },
         });
 
         return { error: error?.message ?? null };
       },
-      requestPhoneOtp: async (phone: string) => {
+      signInWithPassword: async ({ email, password }) => {
         if (!supabase) {
           return { error: 'Supabase is not configured.' };
         }
-        const { error } = await supabase.auth.signInWithOtp({ phone });
+
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
         return { error: error?.message ?? null };
       },
-      verifyPhoneOtp: async (phone: string, token: string) => {
+      requestPasswordReset: async (email: string) => {
         if (!supabase) {
           return { error: 'Supabase is not configured.' };
         }
-        const { error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
+
+        const redirectTo = new URL(import.meta.env.BASE_URL, window.location.origin);
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${redirectTo.origin}${redirectTo.pathname}auth`,
+        });
+
+        return { error: error?.message ?? null };
+      },
+      updatePassword: async (password: string) => {
+        if (!supabase) {
+          return { error: 'Supabase is not configured.' };
+        }
+
+        const { error } = await supabase.auth.updateUser({ password });
         return { error: error?.message ?? null };
       },
       signOut: async () => {

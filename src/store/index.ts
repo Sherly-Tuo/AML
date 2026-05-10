@@ -4,7 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { defaultDemandBids } from '../data/vic1DemandBids';
 import { defaultSupplyReports } from '../data/solarSupplyReports';
 import { toHourStartIso, toIsoString } from '../lib/datetime';
-import type { DemandBid, MarketReport, OptimizationRun, Purchase } from '../types';
+import type { AppEvent, DemandBid, MarketReport, OptimizationRun, Purchase } from '../types';
 
 interface NewMarketReport {
   reporterName: string;
@@ -39,6 +39,9 @@ interface AppState {
   demandBids: DemandBid[];
   optimizationHistory: OptimizationRun[];
   purchases: Purchase[];
+  appEvents: AppEvent[];
+  walletCredits: number;
+  redeemedCodes: string[];
   addMarketReport: (report: NewMarketReport) => void;
   removeMarketReport: (id: string) => void;
   resetMarketReports: () => void;
@@ -49,6 +52,8 @@ interface AppState {
   clearOptimizationHistory: () => void;
   addPurchase: (p: NewPurchase) => void;
   clearPurchases: () => void;
+  addAppEvent: (event: Omit<AppEvent, 'id' | 'createdAt'> & { id?: string; createdAt?: string }) => void;
+  redeemPromoCode: (code: string) => { success: boolean; message: string; creditAdded?: number };
 }
 
 export const seedMarketReports: MarketReport[] = defaultSupplyReports;
@@ -123,6 +128,9 @@ export const useStore = create<AppState>()(
       demandBids: seedDemandBids,
       optimizationHistory: [],
       purchases: [],
+      appEvents: [],
+      walletCredits: 0,
+      redeemedCodes: [],
 
       addMarketReport: (report) =>
         set((state) => ({
@@ -204,16 +212,61 @@ export const useStore = create<AppState>()(
         })),
 
       clearPurchases: () => set({ purchases: [] }),
+
+      addAppEvent: (event) =>
+        set((state) => ({
+          appEvents: [
+            {
+              id: event.id ?? createId('event'),
+              eventName: event.eventName,
+              screen: event.screen,
+              userId: event.userId ?? null,
+              metadata: event.metadata ?? {},
+              createdAt: event.createdAt ?? new Date().toISOString(),
+            },
+            ...state.appEvents,
+          ].slice(0, 120),
+        })),
+
+      redeemPromoCode: (code) => {
+        const normalized = code.trim().toUpperCase();
+
+        if (!normalized) {
+          return { success: false, message: 'Enter a promo code first.' };
+        }
+
+        if (normalized !== 'AGRADEPROJECT') {
+          return { success: false, message: 'That code is not valid for this demo.' };
+        }
+
+        let result: { success: boolean; message: string; creditAdded?: number } = {
+          success: true,
+          message: 'AGRADEPROJECT applied. $15.00 credit added.',
+          creditAdded: 15,
+        };
+
+        set((state) => {
+          return {
+            walletCredits: Number((state.walletCredits + 15).toFixed(2)),
+            redeemedCodes: state.redeemedCodes,
+          };
+        });
+
+        return result;
+      },
     }),
     {
       name: 'voltshare-market-db',
-      version: 6,
+      version: 8,
       storage: createJSONStorage(() => safeStorage),
       partialize: (state) => ({
         marketReports: state.marketReports.filter((report) => !isSeedMarketReport(report)),
         demandBids: state.demandBids.filter((bid) => !isSeedDemandBid(bid)),
         optimizationHistory: state.optimizationHistory,
         purchases: state.purchases,
+        appEvents: state.appEvents,
+        walletCredits: state.walletCredits,
+        redeemedCodes: state.redeemedCodes,
       }),
       merge: (persistedState, currentState) => {
         const state = persistedState as Partial<AppState> | undefined;
@@ -225,6 +278,9 @@ export const useStore = create<AppState>()(
           demandBids: [...(state?.demandBids ?? []), ...seedDemandBids],
           optimizationHistory: state?.optimizationHistory ?? [],
           purchases: state?.purchases ?? [],
+          appEvents: state?.appEvents ?? [],
+          walletCredits: state?.walletCredits ?? 0,
+          redeemedCodes: state?.redeemedCodes ?? [],
         };
       },
       migrate: (persistedState, version) => {
@@ -236,6 +292,9 @@ export const useStore = create<AppState>()(
             demandBids: seedDemandBids,
             optimizationHistory: [],
             purchases: [],
+            appEvents: [],
+            walletCredits: 0,
+            redeemedCodes: [],
           };
         }
 
@@ -267,6 +326,15 @@ export const useStore = create<AppState>()(
             marketReports: (state.marketReports ?? []).filter((report) => !isSeedMarketReport(report as MarketReport)),
             demandBids: (state.demandBids ?? []).filter((bid) => !isSeedDemandBid(bid as DemandBid)),
             optimizationHistory: state.optimizationHistory ?? [],
+          };
+        }
+
+        if (version < 8) {
+          return {
+            ...state,
+            appEvents: state.appEvents ?? [],
+            walletCredits: state.walletCredits ?? 0,
+            redeemedCodes: state.redeemedCodes ?? [],
           };
         }
 

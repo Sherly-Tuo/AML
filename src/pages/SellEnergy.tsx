@@ -4,6 +4,7 @@ import { useAuth } from '@/auth/AuthProvider';
 import { defaultDemandDatasetMeta } from '@/data/vic1DemandBids';
 import { parseDateTimeLocalToUtcIso } from '@/lib/datetime';
 import { calculateOptimizedPricing } from '@/services/aiService';
+import { trackAppEvent } from '@/services/analytics';
 import { supabase } from '@/lib/supabase';
 import { useStore } from '@/store';
 import type { PricingRecommendation } from '@/types';
@@ -68,6 +69,17 @@ export default function SellEnergy() {
     );
 
     setRecommendation(result);
+    void trackAppEvent({
+      eventName: 'generate_recommendation',
+      screen: 'sell',
+      userId: user?.id ?? null,
+      metadata: {
+        surplusKwh: parsedSurplus,
+        targetPrice: parsedPrice,
+        optimizedPrice: Number(result.optimizedPrice.toFixed(3)),
+        expectedRevenue: Number(result.expectedRevenue.toFixed(2)),
+      },
+    });
     setSubmitting(false);
   };
 
@@ -95,20 +107,71 @@ export default function SellEnergy() {
       expectedRevenue: recommendation.expectedRevenue,
     });
 
-    // Also persist to Supabase if signed in
+    let remoteSaveError: string | null = null;
+    let recommendationRunId: string | null = null;
+
+    // Persist recommendation history to Supabase if signed in
     if (supabase && user) {
-      const { error } = await supabase.from('trades').insert({
-        seller_id: user.id,
-        surplus_kwh: parsedSurplus,
-        price_per_kwh: recommendation.optimizedPrice,
-        optimized_price: recommendation.optimizedPrice,
-        expected_revenue: recommendation.expectedRevenue,
-        listed_at: listingHourIso,
-      });
-      if (error) {
-        console.error('Failed to save trade to Supabase:', error.message);
+      const { data: runData, error: runError } = await supabase
+        .from('recommendation_runs')
+        .insert({
+          user_id: user.id,
+          surplus_kwh: parsedSurplus,
+          input_price: Number(targetPrice),
+          optimized_price: recommendation.optimizedPrice,
+          expected_revenue: recommendation.expectedRevenue,
+          listing_time: listingHourIso,
+          weather_summary: recommendation.weatherSummary,
+        })
+        .select('id')
+        .single();
+
+      if (runError) {
+        console.error('Failed to save recommendation run to Supabase:', runError.message);
+        remoteSaveError = runError.message;
+      } else {
+        recommendationRunId = runData?.id ?? null;
+      }
+
+      if (!remoteSaveError) {
+        const { error: listingError } = await supabase.from('listings').insert({
+          user_id: user.id,
+          recommendation_run_id: recommendationRunId,
+          title: `${sellerName} surplus listing`,
+          source_type: 'solar',
+          postcode: profile?.postcode ?? null,
+          surplus_kwh: parsedSurplus,
+          listed_price_per_kwh: recommendation.optimizedPrice,
+          estimated_revenue: recommendation.expectedRevenue,
+          status: 'active',
+          visibility: 'public',
+          available_from: listingHourIso,
+        });
+
+        if (listingError) {
+          console.error('Failed to create listing in Supabase:', listingError.message);
+          remoteSaveError = listingError.message;
+        }
       }
     }
+
+    if (remoteSaveError) {
+      setStatus(
+        `Listing saved locally at ${recommendation.optimizedPrice.toFixed(3)}/kWh, but cloud history sync failed: ${remoteSaveError}`,
+      );
+      return;
+    }
+
+    void trackAppEvent({
+      eventName: 'confirm_listing',
+      screen: 'sell',
+      userId: user?.id ?? null,
+      metadata: {
+        surplusKwh: parsedSurplus,
+        optimizedPrice: Number(recommendation.optimizedPrice.toFixed(3)),
+        expectedRevenue: Number(recommendation.expectedRevenue.toFixed(2)),
+      },
+    });
 
     setStatus(`Listing saved at ${recommendation.optimizedPrice.toFixed(3)}/kWh.`);
   };
@@ -123,38 +186,40 @@ export default function SellEnergy() {
         </p>
       </section>
 
-      <form className="space-y-4 rounded-[1.8rem] border border-white/80 bg-white/90 p-5 shadow-[0_18px_40px_rgba(38,84,62,0.08)]" onSubmit={handleRecommend}>
-        <label className="field-block">
-          <span className="field-label">Surplus energy</span>
-          <input className="input-control" value={surplusKwh} onChange={(event) => setSurplusKwh(event.target.value)} />
-        </label>
+      <form data-onboarding-id="sell-form" className="space-y-4 rounded-[1.8rem] border border-white/80 bg-white/90 p-5 shadow-[0_18px_40px_rgba(38,84,62,0.08)]" onSubmit={handleRecommend}>
+        <div data-onboarding-id="sell-form-fields" className="space-y-4">
+          <label className="field-block">
+            <span className="field-label">Surplus energy</span>
+            <input className="input-control" value={surplusKwh} onChange={(event) => setSurplusKwh(event.target.value)} />
+          </label>
 
-        <label className="field-block">
-          <span className="field-label">Your target price</span>
-          <input className="input-control" value={targetPrice} onChange={(event) => setTargetPrice(event.target.value)} />
-        </label>
+          <label className="field-block">
+            <span className="field-label">Your target price</span>
+            <input className="input-control" value={targetPrice} onChange={(event) => setTargetPrice(event.target.value)} />
+          </label>
 
-        <label className="field-block">
-          <span className="field-label">Listing hour</span>
-          <input
-            className="input-control"
-            type="datetime-local"
-            value={listingTime}
-            onChange={(event) => setListingTime(event.target.value)}
-          />
-        </label>
+          <label className="field-block">
+            <span className="field-label">Listing hour</span>
+            <input
+              className="input-control"
+              type="datetime-local"
+              value={listingTime}
+              onChange={(event) => setListingTime(event.target.value)}
+            />
+          </label>
+        </div>
 
         {error ? <div className="rounded-[1.2rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div> : null}
         {status ? <div className="rounded-[1.2rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{status}</div> : null}
 
-        <button className="primary-btn w-full" type="submit" disabled={submitting}>
+        <button data-onboarding-id="sell-generate" className="primary-btn w-full" type="submit" disabled={submitting}>
           {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
           {submitting ? 'Running model...' : 'Get recommendation'}
         </button>
       </form>
 
       {recommendation ? (
-        <section className="rounded-[1.8rem] border border-white/80 bg-white/90 p-5 shadow-[0_18px_40px_rgba(38,84,62,0.08)]">
+        <section data-onboarding-id="sell-recommendation" className="rounded-[1.8rem] border border-white/80 bg-white/90 p-5 shadow-[0_18px_40px_rgba(38,84,62,0.08)]">
           <p className="text-xs uppercase tracking-[0.22em] text-stone-500">VoltShare recommendation</p>
           <h3 className="mt-2 text-3xl font-semibold tracking-tight text-stone-950">
             {recommendation.optimizedPrice.toFixed(3)}/kWh
@@ -168,7 +233,7 @@ export default function SellEnergy() {
             <CardMetric label="Comparable listings" value={`${recommendation.comparableCount}`} />
           </div>
 
-          <button className="primary-btn mt-5 w-full" type="button" onClick={() => void handleConfirmListing()}>
+          <button data-onboarding-id="sell-confirm" className="primary-btn mt-5 w-full" type="button" onClick={() => void handleConfirmListing()}>
             Confirm listing
           </button>
         </section>

@@ -1,6 +1,7 @@
-import { BarChart3, CloudSun, Coins, Leaf, Sparkles, Users } from 'lucide-react';
+import { ArrowLeft, BarChart3, CloudSun, Coins, Database, Leaf, Sparkles, Users } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { defaultDemandDatasetMeta } from '@/data/vic1DemandBids';
 import { defaultSupplyDatasetMeta } from '@/data/solarSupplyReports';
 import { formatDateTime } from '@/lib/datetime';
@@ -64,7 +65,6 @@ export default function AnalyticsDashboard() {
     () => [...marketReports].sort((a, b) => b.surplusKwh - a.surplusKwh)[0] ?? null,
     [marketReports],
   );
-
   const [listingTime, setListingTime] = useState(defaultDemandDatasetMeta.endDate.slice(0, 16));
   const [mySurplusKwh, setMySurplusKwh] = useState(strongestSupplyHour?.surplusKwh.toFixed(1) ?? '5.5');
   const [myPrice, setMyPrice] = useState(strongestSupplyHour?.pricePerKwh.toFixed(3) ?? '0.180');
@@ -148,38 +148,56 @@ export default function AnalyticsDashboard() {
   return (
     <main className="min-h-screen px-4 pb-20 pt-6 sm:px-6 lg:px-10">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        <div>
+          <Link
+            to="/experience"
+            className="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white/90 px-4 py-2 text-sm font-medium text-stone-700 shadow-[0_10px_20px_rgba(38,84,62,0.08)]"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Link>
+        </div>
+
+        <section className="panel space-y-5">
+          <div>
+            <p className="eyebrow">Part 0</p>
+            <h2 className="text-3xl font-semibold tracking-tight text-stone-950">Introduction</h2>
+          </div>
+          <div className="rounded-[1.75rem] border border-stone-200/70 bg-white/88 p-6 shadow-[0_10px_28px_rgba(109,84,35,0.06)]">
+            <p className="text-sm leading-8 text-stone-700 sm:text-[15px]">
+              Solar energy and decentralized clean-energy trading are becoming increasingly important as future power systems shift away from centralized fossil-fuel dependence and toward more distributed renewable supply. Yet traditional electricity allocation remains relatively inflexible: small-scale households can produce excess solar generation, but often have limited ability to price, trade, or reallocate that energy efficiently within their local communities. This project addresses that gap by asking how applied machine learning can support smarter local energy exchange. VoltShare uses historical demand-side and supply-side data, hourly weather context, and predictive pricing logic to recommend a listing price for surplus renewable energy. The AML component combines an interpretable OLS baseline with a Random Forest comparison model, then evaluates candidate prices through an expected-revenue optimization step. In parallel, we built a full-stack web application to simulate how these model outputs could function inside a real user-facing marketplace. The result is both an academic AML exercise and a product prototype at the intersection of climate technology, data science, and digital market design.
+            </p>
+          </div>
+        </section>
+
         <section className="hero-panel">
           <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
             <div className="space-y-5">
               <div className="space-y-3">
-                <p className="eyebrow">VoltShare Analytics</p>
+                <p className="eyebrow">Part 1</p>
                 <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-stone-950 sm:text-5xl">
                   Algorithm Explanation
                 </h1>
                 <p className="max-w-3xl text-base leading-8 text-stone-700 sm:text-lg">
-                  This dashboard is the AML coursework view of VoltShare. Its purpose is to explain how the app’s recommendation engine is built from generated demand-side and supply-side datasets, and how those datasets support optimal price generation.
+                  This dashboard is the academic view of VoltShare. It explains how generated demand-side and supply-side datasets are constructed, how OLS and Random Forest are used inside the pricing workflow, and how the recommendation engine supports a realistic clean-energy trading product.
                 </p>
               </div>
               <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm leading-6 text-emerald-950">
-                Core purpose: demonstrate the algorithm behind VoltShare rather than the app interface itself.
+                Core purpose: show how AML, predictive pricing, and a user-facing web application can be combined to address a real-world clean-energy allocation problem.
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <ModeCard
-                  label="Dashboard mode"
-                  icon="📊"
-                  heading="Algorithm view"
-                  description="Explore how VoltShare's pricing engine works — from raw energy datasets to demand models, supply proxies, and optimal price generation. No sign-in required."
-                  badge="You are here"
-                  badgeStyle="emerald"
+              <div className="grid gap-3 sm:grid-cols-3">
+                <MethodChip
+                  label="Coursework scope"
+                  value="Demand, supply, weather, and price optimization"
                 />
-                <ModeCard
-                  label="App mode"
-                  icon="⚡"
-                  heading="Live trading"
-                  description="Sign in to buy or sell surplus energy with your neighbors. Every completed sale is recorded to your account, and your trading history refreshes each month."
-                  badge="Requires sign-in"
-                  badgeStyle="amber"
+                <MethodChip
+                  label="Models used"
+                  value="OLS baseline + Random Forest comparison"
+                />
+                <MethodChip
+                  label="Final output"
+                  value="A recommended listing price for a target hour"
                 />
               </div>
             </div>
@@ -223,21 +241,21 @@ export default function AnalyticsDashboard() {
           <div className="grid gap-4 lg:grid-cols-3">
             <InfoCard
               title="Demand database"
-              body="The demand-side dataset comes from the VIC1 price-demand file. We combine hourly normalized demand quantity with a buyer-side willingness-to-pay proxy and then model it with OLS and Random Forest."
+              body="The demand-side dataset comes from the VIC1 price-demand file. VoltShare combines hourly normalized demand quantity with a buyer-side willingness-to-pay proxy, then uses OLS and Random Forest to estimate demand pressure under different pricing conditions."
             />
             <InfoCard
               title="Supply database"
-              body="The supply-side dataset comes from quarter-hour solar generation. We aggregate it into hourly household-scale surplus estimates and create supply-side price reference points from those hourly conditions."
+              body="The supply-side dataset comes from quarter-hour solar generation. It is aggregated into hourly household-scale surplus estimates, then converted into supply-side reference prices that approximate what local sellers could realistically list."
             />
             <InfoCard
               title="Price optimization context"
-              body="The price optimization layer joins time features, lag features, supply context, and weather context. It then evaluates candidate listing prices and keeps the one with the strongest expected net revenue."
+              body="The optimization layer joins time features, lag features, supply context, and weather context. It then compares candidate prices and keeps the one with the strongest expected net revenue. Weather is included because solar availability and trading conditions are both time-sensitive."
             />
           </div>
 
           <div className="rounded-[1.7rem] border border-stone-200/70 bg-white/80 p-5">
             <p className="text-sm leading-7 text-stone-700">
-              Pipeline summary: the demand dataset is generated from regional VIC1 market rows, the supply dataset is generated from solar generation records, and the optimization context is generated by aligning time, lag, and weather features at the same hourly timestamp. This is how the app gets from raw energy data to a user-facing recommended listing price.
+              Pipeline summary: the demand dataset is generated from regional VIC1 market rows, the supply dataset is generated from solar generation records, and the optimization context is produced by aligning time, lag, and weather features at the same hourly timestamp. This pipeline converts raw energy data into a recommendation that can be shown inside the product app.
             </p>
           </div>
 
@@ -523,6 +541,75 @@ export default function AnalyticsDashboard() {
         <section className="panel space-y-5">
           <div>
             <p className="eyebrow">Part 6</p>
+            <h2 className="text-3xl font-semibold tracking-tight text-stone-950">Database &amp; backend</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-7 text-stone-600">
+              VoltShare is not only a predictive dashboard; it is also structured as an MVP product system. The backend database stores user activity, listings, completed trades, and model-generated recommendations so the app can simulate a real clean-energy marketplace rather than a one-time technical demo.
+            </p>
+          </div>
+
+          <div className="overflow-hidden rounded-[1.75rem] border border-stone-200/70 bg-white/90 shadow-[0_10px_28px_rgba(109,84,35,0.06)]">
+            <div className="grid grid-cols-[1.1fr_1.3fr_1.1fr] gap-4 border-b border-stone-200/70 bg-stone-50/95 px-5 py-4 text-xs font-semibold uppercase tracking-[0.2em] text-stone-500">
+              <span>Product layer</span>
+              <span>What the backend stores</span>
+              <span>Why it matters</span>
+            </div>
+            {[
+              [
+                'Accounts and profiles',
+                'User identity, display name, avatar, and saved account history',
+                'Lets the app remember the same user over time rather than acting like a one-session demo',
+              ],
+              [
+                'Listings and transactions',
+                'Seller listings, buyer purchases, trade status, and transaction history',
+                'Makes the marketplace behave like a real product where one user can post and another can buy',
+              ],
+              [
+                'Recommendation history',
+                'Past OLS / Random Forest price recommendations and pricing outputs',
+                'Allows model outputs to be tracked, compared, and used for future iteration',
+              ],
+              [
+                'Behavioral signals',
+                'Wallet activity, promo-code usage, and user interaction history',
+                'Supports product analysis and helps identify where the app experience can improve',
+              ],
+              [
+                'Model refresh cycle',
+                'Updated demand-side and supply-side reference data loaded over time',
+                'Creates a path for future retraining and more dynamic pricing mechanisms',
+              ],
+            ].map(([layer, stores, matters]) => (
+              <div
+                key={layer}
+                className="grid grid-cols-[1.1fr_1.3fr_1.1fr] gap-4 border-t border-stone-100 px-5 py-4 text-sm leading-7 text-stone-700 first:border-t-0"
+              >
+                <span className="font-semibold text-stone-950">{layer}</span>
+                <span>{stores}</span>
+                <span>{matters}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <InfoCard
+              title="Why this backend exists"
+              body="The backend turns VoltShare from a static coursework page into a minimal product system. It remembers users, stores trades, and preserves recommendation history across sessions."
+            />
+            <InfoCard
+              title="Why this matters for AML"
+              body="A stored history of recommendations and transactions creates the basis for evaluating whether OLS and Random Forest predictions remain useful over time and where future retraining is needed."
+            />
+            <InfoCard
+              title="Why this matters for product design"
+              body="Because user actions are recorded, VoltShare can later support more adaptive pricing, stronger personalization, and a more realistic local energy marketplace."
+            />
+          </div>
+        </section>
+
+        <section className="panel space-y-5">
+          <div>
+            <p className="eyebrow">Part 7</p>
             <h2 className="text-3xl font-semibold tracking-tight text-stone-950">Limitations</h2>
           </div>
 
@@ -543,6 +630,19 @@ export default function AnalyticsDashboard() {
               title="No real postcode matching"
               body="The current raw datasets do not contain postcode, meter, or feeder-level identity, so true neighbor eligibility is not yet validated."
             />
+          </div>
+        </section>
+
+        <section className="panel space-y-5">
+          <div>
+            <p className="eyebrow">Part 8</p>
+            <h2 className="text-3xl font-semibold tracking-tight text-stone-950">Policy implication</h2>
+          </div>
+
+          <div className="rounded-[1.75rem] border border-stone-200/70 bg-white/88 p-6 shadow-[0_10px_28px_rgba(109,84,35,0.06)]">
+            <p className="text-sm leading-8 text-stone-700 sm:text-[15px]">
+              Decentralized energy trading has broader policy relevance because it can make clean-energy adoption more economically meaningful for households rather than treating rooftop solar as a passive asset. If small-scale producers can respond to local demand conditions and receive more informed pricing signals, renewable generation becomes easier to monetize and therefore more attractive to adopt. In this sense, data-driven pricing is not only a product feature; it can also contribute to more efficient energy allocation by helping surplus electricity flow toward times and places where it is most valued. Applied machine learning and predictive analytics are especially relevant here because future smart-grid systems will likely depend on granular, time-sensitive decision tools rather than static tariffs alone. A platform like VoltShare illustrates how model-assisted pricing could support local community energy markets, where households, small businesses, and distributed storage systems interact more dynamically. From a policy perspective, this points toward several areas of possible government or regulatory support: interoperability standards for local trading platforms, clearer rules around peer-to-peer settlement, consumer protections for algorithmic pricing, and better access to distributed generation data. The long-run implication is that sustainability goals and economic incentives do not need to be in conflict. If pricing systems become more adaptive, transparent, and locally responsive, decentralized clean-energy markets could strengthen both renewable adoption and overall grid efficiency.
+            </p>
           </div>
         </section>
       </div>
@@ -590,25 +690,41 @@ function FormulaCard({
   rationale: string;
 }) {
   return (
-    <div className="rounded-[1.7rem] border border-amber-200/60 bg-[linear-gradient(150deg,rgba(255,254,249,0.98),rgba(253,247,233,0.90))] p-6 shadow-[0_6px_22px_rgba(109,84,35,0.08)]">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-stone-400">{title}</p>
-      <div className="my-4 border-y border-stone-200/70 py-4">
+    <div className="rounded-[1.7rem] border border-emerald-200/60 bg-[linear-gradient(150deg,rgba(253,255,253,0.98),rgba(244,251,247,0.92))] p-6 shadow-[0_8px_24px_rgba(38,84,62,0.07)]">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-stone-400">{title}</p>
+        <span className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-800">
+          Formula
+        </span>
+      </div>
+      <div className="my-4 rounded-[1.3rem] border border-emerald-100 bg-white/90 px-5 py-5">
         <pre
-          className="whitespace-pre-wrap text-[1.13rem] leading-[2.05] text-stone-900"
-          style={{ fontFamily: "'EB Garamond', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif", letterSpacing: '0.012em' }}
+          className="whitespace-pre-wrap text-center text-[1.14rem] leading-[2.05] text-stone-900"
+          style={{ fontFamily: "'EB Garamond', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif", letterSpacing: '0.01em' }}
         >
           {formula}
         </pre>
       </div>
-      <p className="text-sm leading-7 text-stone-500">{rationale}</p>
+      <p className="text-sm leading-7 text-stone-600">{rationale}</p>
     </div>
   );
 }
 
-function InfoCard({ title, body }: { title: string; body: string }) {
+function InfoCard({
+  title,
+  body,
+  icon: Icon,
+}: {
+  title: string;
+  body: string;
+  icon?: typeof Database;
+}) {
   return (
-    <div className="rounded-[1.6rem] border border-stone-200/70 bg-white/85 p-5 shadow-[0_10px_28px_rgba(109,84,35,0.06)]">
-      <p className="text-base font-semibold text-stone-950">{title}</p>
+    <div className="rounded-[1.6rem] border border-stone-200/70 bg-white/90 p-5 shadow-[0_10px_28px_rgba(109,84,35,0.06)]">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-base font-semibold text-stone-950">{title}</p>
+        {Icon ? <Icon className="h-4.5 w-4.5 text-emerald-700" /> : null}
+      </div>
       <p className="mt-3 text-sm leading-7 text-stone-600">{body}</p>
     </div>
   );
@@ -632,41 +748,6 @@ function ResultCard({
   );
 }
 
-function ModeCard({
-  label,
-  icon,
-  heading,
-  description,
-  badge,
-  badgeStyle,
-}: {
-  label: string;
-  icon: string;
-  heading: string;
-  description: string;
-  badge: string;
-  badgeStyle: 'emerald' | 'amber';
-}) {
-  const badgeClass =
-    badgeStyle === 'emerald'
-      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-      : 'bg-amber-100 text-amber-800 border border-amber-200';
-
-  return (
-    <div className="rounded-[1.5rem] border border-stone-200/80 bg-white/85 p-4 shadow-[0_8px_24px_rgba(109,84,35,0.07)]">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-stone-400">{label}</p>
-        <span className="text-lg leading-none">{icon}</span>
-      </div>
-      <p className="mt-2 text-base font-semibold text-stone-950">{heading}</p>
-      <p className="mt-2 text-sm leading-6 text-stone-600">{description}</p>
-      <div className={`mt-3 inline-block rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${badgeClass}`}>
-        {badge}
-      </div>
-    </div>
-  );
-}
-
 function SampleTable({
   heading,
   columns,
@@ -683,12 +764,15 @@ function SampleTable({
       <div className="border-b border-stone-200/70 px-4 py-4">
         <h3 className="text-lg font-semibold tracking-tight text-stone-950">{heading}</h3>
       </div>
-      <div className={`grid gap-3 border-b border-stone-200/70 px-4 py-3 text-xs font-medium uppercase tracking-[0.18em] text-stone-500`} style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}>
-        {columns.map((column) => (
-          <span key={column}>{column}</span>
-        ))}
-      </div>
       <div className={`${scrollHeight} overflow-auto`}>
+        <div
+          className="sticky top-0 z-10 grid gap-3 border-b border-stone-200/70 bg-stone-50/95 px-4 py-3 text-xs font-medium uppercase tracking-[0.18em] text-stone-500 backdrop-blur"
+          style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
+        >
+          {columns.map((column) => (
+            <span key={column}>{column}</span>
+          ))}
+        </div>
         {rows.map((row, index) => (
           <div
             key={`${heading}-${index}`}
@@ -703,6 +787,15 @@ function SampleTable({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function MethodChip({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[1.4rem] border border-stone-200/80 bg-white/88 px-4 py-4 shadow-[0_8px_24px_rgba(109,84,35,0.05)]">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-stone-400">{label}</p>
+      <p className="mt-2 text-sm leading-6 text-stone-800">{value}</p>
     </div>
   );
 }

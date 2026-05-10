@@ -1,7 +1,10 @@
 import { BatteryCharging, CheckCircle2, MapPin, Sun, Wind, X, Zap } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '@/auth/AuthProvider';
+import { trackAppEvent } from '@/services/analytics';
+import { supabase } from '@/lib/supabase';
 import { useStore } from '@/store';
-import type { Purchase } from '@/types';
 
 const sourceIcons = [Sun, Wind, BatteryCharging] as const;
 const sourceLabels = ['Solar', 'Wind', 'Battery'] as const;
@@ -14,38 +17,275 @@ type Listing = {
   trust: string;
   surplusKwh: number;
   pricePerKwh: number;
+  displayPricePerKwh: number;
+  sellerUserId?: string | null;
+  postcode?: string | null;
+  suburb?: string | null;
+  isRemote?: boolean;
   Icon: (typeof sourceIcons)[number];
 };
 
+type RemoteListingRow = {
+  id: string;
+  user_id: string;
+  title: string | null;
+  source_type: string;
+  postcode: string | null;
+  suburb: string | null;
+  surplus_kwh: number;
+  listed_price_per_kwh: number;
+  status: string;
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
 export default function Marketplace() {
+  const { user } = useAuth();
   const marketReports = useStore((s) => s.marketReports);
+  const optimizationHistory = useStore((s) => s.optimizationHistory);
+  const purchases = useStore((s) => s.purchases);
+  const walletCredits = useStore((s) => s.walletCredits);
   const addPurchase = useStore((s) => s.addPurchase);
   const [activeListing, setActiveListing] = useState<Listing | null>(null);
+  const [remoteListings, setRemoteListings] = useState<Listing[]>([]);
+  const [remoteLoaded, setRemoteLoaded] = useState(false);
+  const [remoteCredits, setRemoteCredits] = useState<number | null>(null);
 
-  const listings = useMemo<Listing[]>(
+  const walletProjection = optimizationHistory.reduce((sum, run) => sum + run.expectedRevenue, 0);
+  const purchasedTotal = purchases.reduce((sum, purchase) => sum + purchase.totalCost, 0);
+  const effectiveWalletCredits = remoteCredits ?? walletCredits;
+  const effectiveBalance = Number((effectiveWalletCredits + walletProjection - purchasedTotal).toFixed(2));
+
+  const fallbackListings = useMemo<Listing[]>(
     () =>
       [...marketReports]
         .filter((r) => r.surplusKwh > 0.2)
-        .sort((a, b) => a.pricePerKwh - b.pricePerKwh)
+        .sort((a, b) => b.surplusKwh - a.surplusKwh)
         .slice(0, 10)
-        .map((r, i) => ({
-          ...r,
-          source: sourceLabels[i % sourceLabels.length],
-          distanceKm: (0.8 + i * 0.7).toFixed(1),
-          neighborhood: ['Northcote', 'Brunswick', 'Carlton', 'Footscray', 'Fitzroy'][i % 5],
-          trust: ['Verified meter', 'Green household', 'Fast responder'][i % 3],
-          Icon: sourceIcons[i % sourceIcons.length],
-        })),
+        .map((r, i) => {
+          const source = sourceLabels[i % sourceLabels.length];
+          const distanceKm = (0.8 + i * 0.7).toFixed(1);
+          const sourcePremium = source === 'Battery' ? 0.012 : source === 'Wind' ? 0.006 : 0;
+          const scarcityPremium = clamp((7 - Math.min(r.surplusKwh, 7)) * 0.0035, 0, 0.02);
+          const distancePremium = Number(distanceKm) < 1.2 ? 0.004 : Number(distanceKm) < 2 ? 0.002 : 0;
+          const sellerPremium = (i % 4) * 0.002;
+          const displayPricePerKwh = clamp(
+            Number((r.pricePerKwh + sourcePremium + scarcityPremium + distancePremium + sellerPremium).toFixed(3)),
+            0.118,
+            0.228,
+          );
+
+          return {
+            ...r,
+            source,
+            distanceKm,
+            displayPricePerKwh,
+            neighborhood: ['Northcote', 'Brunswick', 'Carlton', 'Footscray', 'Fitzroy'][i % 5],
+            trust: ['Verified meter', 'Green household', 'Fast responder'][i % 3],
+            Icon: sourceIcons[i % sourceIcons.length],
+          };
+        }),
     [marketReports],
   );
 
-  const handleConfirm = (kwh: number) => {
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadRemoteListings = async () => {
+      if (!supabase) {
+        if (isMounted) {
+          setRemoteLoaded(true);
+        }
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('listings')
+        .select('id, user_id, title, source_type, postcode, suburb, surplus_kwh, listed_price_per_kwh, status')
+        .in('status', ['active', 'partially_filled'])
+        .order('created_at', { ascending: false })
+        .limit(12);
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (error) {
+        console.error('Failed to load active listings from Supabase:', error.message);
+        setRemoteLoaded(true);
+        return;
+      }
+
+      const mapped = (data as RemoteListingRow[]).map((row, index) => {
+        const normalizedSource = row.source_type.toLowerCase();
+        const source: Listing['source'] =
+          normalizedSource === 'wind'
+            ? 'Wind'
+            : normalizedSource === 'battery'
+            ? 'Battery'
+            : 'Solar';
+
+        const neighborhood =
+          row.suburb?.trim() ||
+          (row.postcode ? `Postcode ${row.postcode}` : row.title?.replace(/ surplus listing$/i, '').trim()) ||
+          `VoltShare seller ${index + 1}`;
+
+        return {
+          id: row.id,
+          neighborhood,
+          source,
+          distanceKm: (0.8 + index * 0.6).toFixed(1),
+          trust: row.postcode ? 'Verified area' : 'Verified meter',
+          surplusKwh: Number(row.surplus_kwh),
+          pricePerKwh: Number(row.listed_price_per_kwh),
+          displayPricePerKwh: Number(row.listed_price_per_kwh),
+          sellerUserId: row.user_id,
+          postcode: row.postcode,
+          suburb: row.suburb,
+          isRemote: true,
+          Icon: source === 'Wind' ? Wind : source === 'Battery' ? BatteryCharging : Sun,
+        };
+      });
+
+      setRemoteListings(mapped);
+      setRemoteLoaded(true);
+    };
+
+    void loadRemoteListings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!supabase || !user) {
+      setRemoteCredits(null);
+      return;
+    }
+
+    const client = supabase;
+    let isMounted = true;
+
+    const loadCredits = async () => {
+      const { data, error } = await client
+        .from('wallet_credit_events')
+        .select('amount')
+        .eq('user_id', user.id);
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (error) {
+        console.error('Failed to load wallet credit events:', error.message);
+        setRemoteCredits(null);
+        return;
+      }
+
+      const creditTotal = (data ?? []).reduce((sum, row) => sum + Number(row.amount ?? 0), 0);
+      setRemoteCredits(Number(creditTotal.toFixed(2)));
+    };
+
+    void loadCredits();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id]);
+
+  const listings = remoteListings.length > 0 ? remoteListings : fallbackListings;
+
+  const handleConfirm = async (kwh: number) => {
     if (!activeListing) return;
+
+    const totalCost = Number((kwh * activeListing.displayPricePerKwh).toFixed(2));
+
+    if (supabase && user && activeListing.isRemote && activeListing.sellerUserId) {
+      const remainingSurplus = Number((activeListing.surplusKwh - kwh).toFixed(2));
+      const nextStatus = remainingSurplus <= 0.05 ? 'sold' : 'partially_filled';
+
+      const { error: transactionError } = await supabase.from('transactions').insert({
+        listing_id: activeListing.id,
+        buyer_user_id: user.id,
+        seller_user_id: activeListing.sellerUserId,
+        source_type: activeListing.source.toLowerCase(),
+        postcode: activeListing.postcode ?? null,
+        suburb: activeListing.suburb ?? activeListing.neighborhood,
+        kwh_traded: kwh,
+        agreed_price_per_kwh: activeListing.displayPricePerKwh,
+        total_amount: totalCost,
+        status: 'completed',
+      });
+
+      if (transactionError) {
+        console.error('Failed to save transaction to Supabase:', transactionError.message);
+        return;
+      }
+
+      const { error: listingUpdateError } = await supabase
+        .from('listings')
+        .update({
+          surplus_kwh: Math.max(0, remainingSurplus),
+          status: nextStatus,
+        })
+        .eq('id', activeListing.id);
+
+      if (listingUpdateError) {
+        console.error('Failed to update listing status in Supabase:', listingUpdateError.message);
+        return;
+      }
+
+      setRemoteListings((current) =>
+        current
+          .map((listing) =>
+            listing.id === activeListing.id
+              ? {
+                  ...listing,
+                  surplusKwh: Math.max(0, remainingSurplus),
+                }
+              : listing,
+          )
+          .filter((listing) => listing.id !== activeListing.id || remainingSurplus > 0.05),
+      );
+    }
+
     addPurchase({
       sellerNeighborhood: activeListing.neighborhood,
       source: activeListing.source,
       kwhBought: kwh,
-      pricePerKwh: activeListing.pricePerKwh,
+      pricePerKwh: activeListing.displayPricePerKwh,
+    });
+
+    if (supabase && user) {
+      const { error } = await supabase.from('purchases').insert({
+        user_id: user.id,
+        seller_neighborhood: activeListing.neighborhood,
+        source: activeListing.source,
+        kwh_bought: kwh,
+        price_per_kwh: activeListing.displayPricePerKwh,
+        total_cost: totalCost,
+      });
+
+      if (error) {
+        console.error('Failed to save purchase to Supabase:', error.message);
+      }
+    }
+
+    void trackAppEvent({
+      eventName: 'complete_purchase',
+      screen: 'buy',
+      userId: user?.id ?? null,
+      metadata: {
+        seller: activeListing.neighborhood,
+        source: activeListing.source,
+        kwhBought: Number(kwh.toFixed(1)),
+        pricePerKwh: Number(activeListing.displayPricePerKwh.toFixed(3)),
+        totalCost,
+        listingId: activeListing.id,
+      },
     });
   };
 
@@ -60,11 +300,12 @@ export default function Marketplace() {
       </section>
 
       <div className="space-y-3">
-        {listings.map((listing) => {
+        {listings.map((listing, index) => {
           const Icon = listing.Icon;
           return (
             <article
               key={listing.id}
+              data-onboarding-id={index === 0 ? 'buy-first-listing' : undefined}
               className="rounded-[1.8rem] border border-white/80 bg-white/90 p-4 shadow-[0_18px_40px_rgba(38,84,62,0.08)]"
             >
               <div className="flex items-start justify-between gap-3">
@@ -86,7 +327,7 @@ export default function Marketplace() {
               </div>
 
               <div className="mt-4 grid grid-cols-3 gap-3">
-                <ValueBlock label="Price" value={`${listing.pricePerKwh.toFixed(3)}/kWh`} />
+                <ValueBlock label="Price" value={`${listing.displayPricePerKwh.toFixed(3)}/kWh`} />
                 <ValueBlock label="Available" value={`${listing.surplusKwh.toFixed(1)} kWh`} />
                 <ValueBlock label="Trust" value={listing.trust} compact />
               </div>
@@ -102,13 +343,21 @@ export default function Marketplace() {
             </article>
           );
         })}
+
+        {remoteLoaded && listings.length === 0 ? (
+          <div className="rounded-[1.8rem] border border-white/80 bg-white/90 p-5 text-sm leading-6 text-stone-600 shadow-[0_18px_40px_rgba(38,84,62,0.08)]">
+            No active listings yet. Create one from the Sell tab and it will appear here.
+          </div>
+        ) : null}
       </div>
 
       {activeListing && (
         <BuyModal
           listing={activeListing}
+          effectiveBalance={effectiveBalance}
           onClose={() => setActiveListing(null)}
           onConfirm={handleConfirm}
+          userId={user?.id ?? null}
         />
       )}
     </div>
@@ -120,22 +369,45 @@ type BuyStep = 'input' | 'success';
 
 function BuyModal({
   listing,
+  effectiveBalance,
   onClose,
   onConfirm,
+  userId,
 }: {
   listing: Listing;
+  effectiveBalance: number;
   onClose: () => void;
-  onConfirm: (kwh: number) => void;
+  onConfirm: (kwh: number) => Promise<void>;
+  userId: string | null;
 }) {
   const maxKwh = Math.floor(listing.surplusKwh * 10) / 10;
   const [kwh, setKwh] = useState(Math.min(1, maxKwh));
   const [step, setStep] = useState<BuyStep>('input');
+  const [submitting, setSubmitting] = useState(false);
 
-  const total = (kwh * listing.pricePerKwh).toFixed(2);
+  const totalNumber = Number((kwh * listing.displayPricePerKwh).toFixed(2));
+  const total = totalNumber.toFixed(2);
+  const insufficientBalance = totalNumber > effectiveBalance + 0.0001;
   const Icon = listing.Icon;
 
-  const handleConfirm = () => {
-    onConfirm(kwh);
+  const handleConfirm = async () => {
+    if (insufficientBalance) {
+      void trackAppEvent({
+        eventName: 'purchase_blocked_insufficient_balance',
+        screen: 'buy',
+        userId,
+        metadata: {
+          requiredBalance: totalNumber,
+          walletBalance: effectiveBalance,
+          seller: listing.neighborhood,
+        },
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    await onConfirm(kwh);
+    setSubmitting(false);
     setStep('success');
   };
 
@@ -207,28 +479,52 @@ function BuyModal({
             {/* Price breakdown */}
             <div className="mt-4 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-stone-500">{kwh.toFixed(1)} kWh × ${listing.pricePerKwh.toFixed(3)}/kWh</span>
+                <span className="text-stone-500">{kwh.toFixed(1)} kWh × ${listing.displayPricePerKwh.toFixed(3)}/kWh</span>
                 <span className="font-medium text-stone-800">${total}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-stone-500">Platform fee</span>
                 <span className="font-medium text-emerald-700">Free</span>
               </div>
-              <div className="flex justify-between text-sm border-t border-stone-100 pt-2 mt-2">
-                <span className="font-semibold text-stone-900">Total</span>
-                <span className="font-semibold text-emerald-800">${total}</span>
-              </div>
+            <div className="flex justify-between text-sm border-t border-stone-100 pt-2 mt-2">
+              <span className="font-semibold text-stone-900">Total</span>
+              <span className="font-semibold text-emerald-800">${total}</span>
             </div>
+          </div>
 
+          <div className="mt-4 rounded-[1.2rem] border border-stone-100 bg-stone-50/80 px-4 py-3">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="text-stone-500">Wallet balance</span>
+              <span className="font-medium text-stone-900">${effectiveBalance.toFixed(2)}</span>
+            </div>
+          </div>
+
+          {insufficientBalance ? (
+            <div className="mt-4 rounded-[1.2rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+              You do not have enough balance for this purchase. Top up first in Wallet to continue.
+            </div>
+          ) : null}
+
+          {insufficientBalance ? (
+            <Link
+              to="/app/wallet"
+              onClick={onClose}
+              className="primary-btn mt-5 w-full justify-center"
+            >
+              Top up in Wallet
+            </Link>
+          ) : (
             <button
               type="button"
-              onClick={handleConfirm}
+              onClick={() => void handleConfirm()}
               className="primary-btn mt-5 w-full"
+              disabled={submitting}
             >
-              Confirm purchase · ${total}
+              {submitting ? 'Saving purchase...' : `Confirm purchase · $${total}`}
             </button>
-          </>
-        ) : (
+          )}
+        </>
+      ) : (
           /* Success state */
           <div className="flex flex-col items-center text-center py-4">
             <div className="h-16 w-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center mb-4">

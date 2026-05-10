@@ -1,4 +1,4 @@
-import type { DemandBid, MarketReport, WeatherHour } from '../types';
+import type { CurrentWeatherSnapshot, DemandBid, MarketReport, WeatherHour } from '../types';
 import { getTimestamp, toHourStartIso, toIsoString } from '../lib/datetime';
 
 export const defaultWeatherLocation = {
@@ -36,6 +36,16 @@ interface OpenMeteoHourlyResponse {
     wind_speed_10m?: number[];
     weather_code?: number[];
     is_day?: number[];
+  };
+}
+
+interface OpenMeteoCurrentResponse {
+  current?: {
+    temperature_2m?: number;
+  };
+  daily?: {
+    sunrise?: string[];
+    sunset?: string[];
   };
 }
 
@@ -184,6 +194,30 @@ export const fetchHistoricalWeather = async (window: HistoricalWeatherWindow) =>
       };
     })
     .filter((hour): hour is WeatherHour => hour !== null);
+};
+
+export const fetchCurrentWeatherSnapshot = async (): Promise<CurrentWeatherSnapshot> => {
+  const weatherUrl = new URL('https://api.open-meteo.com/v1/forecast');
+  weatherUrl.searchParams.set('latitude', String(defaultWeatherLocation.latitude));
+  weatherUrl.searchParams.set('longitude', String(defaultWeatherLocation.longitude));
+  weatherUrl.searchParams.set('current', 'temperature_2m');
+  weatherUrl.searchParams.set('daily', 'sunrise,sunset');
+  weatherUrl.searchParams.set('timezone', defaultWeatherLocation.timezone);
+
+  const response = await fetch(weatherUrl.toString());
+
+  if (!response.ok) {
+    throw new Error(`Current weather API returned ${response.status}.`);
+  }
+
+  const payload = (await response.json()) as OpenMeteoCurrentResponse;
+
+  return {
+    locationLabel: defaultWeatherLocation.label,
+    temperatureC: payload.current?.temperature_2m ?? 0,
+    sunriseTime: payload.daily?.sunrise?.[0],
+    sunsetTime: payload.daily?.sunset?.[0],
+  };
 };
 
 export const alignHistoricalWeatherWithMarket = (

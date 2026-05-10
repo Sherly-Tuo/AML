@@ -1,80 +1,186 @@
-import { ArrowLeft, LoaderCircle, Mail, Phone, ShieldCheck, Sparkles, Wallet } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { ArrowLeft, LoaderCircle, Lock, Mail, ShieldCheck, Sparkles, UserRound, Wallet } from 'lucide-react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthProvider';
 
-type Mode = 'email' | 'phone-entry' | 'phone-otp';
+type Mode = 'sign-in' | 'sign-up' | 'forgot' | 'reset';
 
-function isRateLimitError(msg: string) {
-  return /rate.?limit|too many|email.*limit/i.test(msg);
+function getRecoveryMode(): Mode | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const raw = `${window.location.hash}${window.location.search}`.toLowerCase();
+  return raw.includes('type=recovery') ? 'reset' : null;
 }
 
 export default function Auth() {
-  const { hasSupabaseConfig, loading, user, requestMagicLink, requestPhoneOtp, verifyPhoneOtp } =
-    useAuth();
+  const {
+    hasSupabaseConfig,
+    user,
+    signUpWithPassword,
+    signInWithPassword,
+    requestPasswordReset,
+    updatePassword,
+    signOut,
+  } = useAuth();
+  const navigate = useNavigate();
 
-  const [mode, setMode] = useState<Mode>('email');
+  const recoveryMode = useMemo(() => getRecoveryMode(), []);
+  const [mode, setMode] = useState<Mode>(recoveryMode ?? 'sign-in');
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
-  const [rateLimited, setRateLimited] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  if (!loading && user) {
-    return <Navigate to="/experience" replace />;
-  }
+  useEffect(() => {
+    if (recoveryMode === 'reset') {
+      setMode('reset');
+    }
+  }, [recoveryMode]);
 
-  /* ── Email submit ── */
-  const handleEmailSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  useEffect(() => {
+    if (user) {
+      navigate('/experience', { replace: true });
+    }
+  }, [navigate, user]);
+
+  const resetFeedback = () => {
     setError('');
     setStatus('');
-    if (!email.trim()) { setError('Enter an email address first.'); return; }
-    setSubmitting(true);
-    const result = await requestMagicLink(email.trim());
-    setSubmitting(false);
-    if (result.error) {
-      setError(result.error);
-      if (isRateLimitError(result.error)) setRateLimited(true);
+  };
+
+  const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    resetFeedback();
+
+    if (!email.trim() || !password.trim()) {
+      setError('Enter both your email and password.');
       return;
     }
-    setStatus(`Check ${email.trim()} for your sign-in link.`);
+
+    setSubmitting(true);
+    const result = await signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+    setSubmitting(false);
+
+    if (result.error) {
+      if (result.error.toLowerCase().includes('invalid login credentials')) {
+        setError('Invalid email or password. If you just created this account, your Supabase project may still require email confirmation before first sign-in.');
+      } else {
+        setError(result.error);
+      }
+      return;
+    }
   };
 
-  /* ── Phone: send OTP ── */
-  const handlePhoneSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleSignUp = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError('');
-    setStatus('');
-    const cleaned = phone.trim().replace(/\s+/g, '');
-    if (!cleaned) { setError('Enter a phone number first.'); return; }
+    resetFeedback();
+
+    if (!displayName.trim()) {
+      setError('Enter a display name first.');
+      return;
+    }
+
+    if (!email.trim() || !password.trim()) {
+      setError('Enter your email and password first.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Use a password with at least 6 characters.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
     setSubmitting(true);
-    const result = await requestPhoneOtp(cleaned);
+    const result = await signUpWithPassword({
+      email: email.trim(),
+      password,
+      displayName: displayName.trim(),
+    });
     setSubmitting(false);
-    if (result.error) { setError(result.error); return; }
-    setMode('phone-otp');
-    setStatus('Code sent — check your SMS.');
+
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+
+    setStatus('Account created. If email confirmation is enabled in Supabase, confirm your email before the first sign-in.');
+    setMode('sign-in');
+    setPassword('');
+    setConfirmPassword('');
   };
 
-  /* ── Phone: verify OTP ── */
-  const handleOtpSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleForgotPassword = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError('');
-    if (!otp.trim()) { setError('Enter the 6-digit code from your SMS.'); return; }
+    resetFeedback();
+
+    if (!email.trim()) {
+      setError('Enter your email first.');
+      return;
+    }
+
     setSubmitting(true);
-    const result = await verifyPhoneOtp(phone.trim().replace(/\s+/g, ''), otp.trim());
+    const result = await requestPasswordReset(email.trim());
     setSubmitting(false);
-    if (result.error) { setError(result.error); return; }
-    // Auth state change handled by AuthProvider
+
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+
+    setStatus(`Password reset link sent to ${email.trim()}.`);
   };
+
+  const handleResetPassword = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    resetFeedback();
+
+    if (!password.trim()) {
+      setError('Enter your new password first.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Use a password with at least 6 characters.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setSubmitting(true);
+    const result = await updatePassword(password);
+    setSubmitting(false);
+
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+
+    setStatus('Password updated. You can keep using VoltShare with this account.');
+    setPassword('');
+    setConfirmPassword('');
+  };
+
+  const isFormDisabled = !hasSupabaseConfig || submitting;
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(188,242,212,0.35),transparent_24%),linear-gradient(180deg,#f6fbf7_0%,#eff7f0_100%)] px-4 py-6">
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-md flex-col gap-4">
-
-        {/* Top bar */}
         <div className="flex items-center justify-between">
           <Link
             to="/"
@@ -84,186 +190,247 @@ export default function Auth() {
             Back
           </Link>
           <span className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-emerald-800">
-            Secure sign-in
+            Account
           </span>
         </div>
 
-        {/* Hero card */}
         <section className="rounded-[2.2rem] bg-emerald-950 px-5 py-6 text-white shadow-[0_24px_60px_rgba(16,24,20,0.20)]">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.24em] text-emerald-200">VoltShare</p>
               <h1 className="mt-3 text-4xl font-semibold tracking-tight">
-                {mode === 'email' ? 'Sign in with email' : mode === 'phone-entry' ? 'Sign in with phone' : 'Enter your code'}
+                {mode === 'sign-up'
+                  ? 'Create your account'
+                  : mode === 'forgot'
+                    ? 'Reset your password'
+                    : mode === 'reset'
+                      ? 'Choose a new password'
+                      : 'Sign in with email'}
               </h1>
               <p className="mt-3 max-w-[17rem] text-sm leading-6 text-emerald-50/80">
-                {mode === 'email'
-                  ? 'Get a secure sign-in link sent straight to your inbox.'
-                  : mode === 'phone-entry'
-                  ? 'We\'ll send a one-time code to your mobile number.'
-                  : `Code sent to ${phone}. It expires in 60 seconds.`}
+                {mode === 'sign-up'
+                  ? 'Create an account to save listings, purchases, wallet credits, avatar, and your full VoltShare history.'
+                  : mode === 'forgot'
+                    ? 'Enter your email and we will send you a password reset link.'
+                    : mode === 'reset'
+                      ? 'Set a fresh password for your VoltShare account and keep your saved history attached to this login.'
+                      : 'Sign in to keep your profile, avatar, wallet balance, activity, and marketplace history under one account.'}
               </p>
             </div>
             <div className="rounded-[1.5rem] bg-white/10 p-3">
-              {mode === 'email' ? (
-                <ShieldCheck className="h-6 w-6 text-emerald-100" />
+              {mode === 'sign-up' ? (
+                <UserRound className="h-6 w-6 text-emerald-100" />
               ) : (
-                <Phone className="h-6 w-6 text-emerald-100" />
+                <ShieldCheck className="h-6 w-6 text-emerald-100" />
               )}
             </div>
           </div>
           <div className="mt-5 grid grid-cols-2 gap-3">
-            <FeaturePill icon={Wallet} label="Save your runs" />
-            <FeaturePill icon={Sparkles} label="Unlock account history" />
+            <FeaturePill icon={Wallet} label="Save your history" />
+            <FeaturePill icon={Sparkles} label="Avatar + profile" />
           </div>
         </section>
 
-        {/* Form card */}
-        <section className="rounded-[2rem] border border-white/80 bg-white/92 p-5 shadow-[0_18px_40px_rgba(38,84,62,0.10)]">
+        {user ? null : (
+          <section className="rounded-[2rem] border border-white/80 bg-white/92 p-5 shadow-[0_18px_40px_rgba(38,84,62,0.10)]">
+            {!hasSupabaseConfig ? (
+              <div className="mb-4 rounded-[1.4rem] border border-amber-200 bg-amber-50/85 px-4 py-4 text-sm leading-6 text-amber-950">
+                Supabase is not configured yet. Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> to
+                your local environment, then refresh.
+              </div>
+            ) : null}
 
-          {/* Mode tabs */}
-          <div className="flex gap-2 mb-5">
-            <button
-              type="button"
-              onClick={() => { setMode('email'); setError(''); setStatus(''); }}
-              className={`flex-1 rounded-[1.1rem] py-2.5 text-sm font-medium transition ${
-                mode === 'email'
-                  ? 'bg-emerald-950 text-white'
-                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-              }`}
-            >
-              <Mail className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
-              Email
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMode('phone-entry'); setError(''); setStatus(''); }}
-              className={`flex-1 rounded-[1.1rem] py-2.5 text-sm font-medium transition ${
-                mode === 'phone-entry' || mode === 'phone-otp'
-                  ? 'bg-emerald-950 text-white'
-                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-              }`}
-            >
-              <Phone className="h-3.5 w-3.5 inline mr-1.5 -mt-0.5" />
-              Phone
-            </button>
-          </div>
+            {mode !== 'forgot' && mode !== 'reset' ? (
+              <div className="mb-5 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('sign-in');
+                    resetFeedback();
+                  }}
+                  className={`rounded-[1.1rem] py-2.5 text-sm font-medium transition ${
+                    mode === 'sign-in' ? 'bg-emerald-950 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                  }`}
+                >
+                  <Mail className="mr-1.5 inline h-3.5 w-3.5 -mt-0.5" />
+                  Sign in
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('sign-up');
+                    resetFeedback();
+                  }}
+                  className={`rounded-[1.1rem] py-2.5 text-sm font-medium transition ${
+                    mode === 'sign-up' ? 'bg-emerald-950 text-white' : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                  }`}
+                >
+                  <UserRound className="mr-1.5 inline h-3.5 w-3.5 -mt-0.5" />
+                  Create account
+                </button>
+              </div>
+            ) : null}
 
-          {!hasSupabaseConfig && (
-            <div className="mb-4 rounded-[1.4rem] border border-amber-200 bg-amber-50/85 px-4 py-4 text-sm leading-6 text-amber-950">
-              Supabase is not configured yet. Add <code>VITE_SUPABASE_URL</code> and{' '}
-              <code>VITE_SUPABASE_ANON_KEY</code> to your local environment, then refresh.
-            </div>
-          )}
-
-          {/* Rate limit nudge */}
-          {rateLimited && mode === 'email' && (
-            <div className="mb-4 rounded-[1.4rem] border border-amber-200 bg-amber-50/85 px-4 py-3 text-sm leading-6 text-amber-950">
-              Email rate limit reached.{' '}
-              <button
-                type="button"
-                className="font-semibold underline underline-offset-2 hover:text-amber-800"
-                onClick={() => { setMode('phone-entry'); setError(''); setStatus(''); setRateLimited(false); }}
-              >
-                Try signing in with your phone instead →
-              </button>
-            </div>
-          )}
-
-          {/* ── Email form ── */}
-          {mode === 'email' && (
-            <form className="space-y-4" onSubmit={handleEmailSubmit}>
-              <label className="field-block">
-                <span className="field-label">Email Address</span>
-                <div className="relative">
-                  <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
-                  <input
-                    className="input-control w-full pl-11"
-                    type="email"
-                    autoComplete="email"
-                    placeholder="you@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={!hasSupabaseConfig || submitting}
-                  />
-                </div>
-              </label>
-              <ErrorBanner msg={error} />
-              <StatusBanner msg={status} />
-              <button className="primary-btn w-full" type="submit" disabled={!hasSupabaseConfig || submitting}>
-                {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                {submitting ? 'Sending link…' : 'Send magic link'}
-              </button>
-            </form>
-          )}
-
-          {/* ── Phone entry form ── */}
-          {mode === 'phone-entry' && (
-            <form className="space-y-4" onSubmit={handlePhoneSubmit}>
-              <label className="field-block">
-                <span className="field-label">Mobile Number</span>
-                <div className="relative">
-                  <Phone className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
-                  <input
-                    className="input-control w-full pl-11"
-                    type="tel"
-                    autoComplete="tel"
-                    placeholder="+44 7700 900000"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    disabled={!hasSupabaseConfig || submitting}
-                  />
-                </div>
-              </label>
-              <p className="text-xs text-stone-400 leading-5">
-                Include your country code, e.g. +44 for UK, +1 for US.
-              </p>
-              <ErrorBanner msg={error} />
-              <StatusBanner msg={status} />
-              <button className="primary-btn w-full" type="submit" disabled={!hasSupabaseConfig || submitting}>
-                {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Phone className="h-4 w-4" />}
-                {submitting ? 'Sending code…' : 'Send SMS code'}
-              </button>
-            </form>
-          )}
-
-          {/* ── OTP verification form ── */}
-          {mode === 'phone-otp' && (
-            <form className="space-y-4" onSubmit={handleOtpSubmit}>
-              <StatusBanner msg={status} />
-              <label className="field-block">
-                <span className="field-label">6-digit code</span>
-                <input
-                  className="input-control w-full text-center tracking-[0.4em] text-xl font-semibold"
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="——————"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                  disabled={submitting}
-                  autoFocus
+            {mode === 'sign-in' ? (
+              <form className="space-y-4" onSubmit={handleSignIn}>
+                <LabeledInput
+                  label="Email address"
+                  icon={Mail}
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={setEmail}
+                  disabled={isFormDisabled}
                 />
-              </label>
-              <ErrorBanner msg={error} />
-              <button className="primary-btn w-full" type="submit" disabled={submitting}>
-                {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                {submitting ? 'Verifying…' : 'Verify & sign in'}
-              </button>
-              <button
-                type="button"
-                className="w-full text-sm text-stone-500 hover:text-stone-700 transition"
-                onClick={() => { setMode('phone-entry'); setOtp(''); setError(''); setStatus(''); }}
-              >
-                ← Try a different number
-              </button>
-            </form>
-          )}
+                <LabeledInput
+                  label="Password"
+                  icon={Lock}
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={setPassword}
+                  disabled={isFormDisabled}
+                />
+                <ErrorBanner msg={error} />
+                <StatusBanner msg={status} />
+                <button className="primary-btn w-full" type="submit" disabled={isFormDisabled}>
+                  {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                  {submitting ? 'Signing in…' : 'Sign in'}
+                </button>
+                <button
+                  type="button"
+                  className="w-full text-sm text-stone-500 transition hover:text-stone-700"
+                  onClick={() => {
+                    setMode('forgot');
+                    resetFeedback();
+                  }}
+                >
+                  Forgot password?
+                </button>
+              </form>
+            ) : null}
 
-          <div className="mt-5 rounded-[1.4rem] bg-stone-50/80 px-4 py-4 text-sm leading-6 text-stone-600">
-            Guests can still explore VoltShare without signing in — it simply gives you a personal account layer for saved pricing history.
-          </div>
-        </section>
+            {mode === 'sign-up' ? (
+              <form className="space-y-4" onSubmit={handleSignUp}>
+                <LabeledInput
+                  label="Display name"
+                  icon={UserRound}
+                  type="text"
+                  autoComplete="nickname"
+                  placeholder="How should VoltShare show your name?"
+                  value={displayName}
+                  onChange={setDisplayName}
+                  disabled={isFormDisabled}
+                />
+                <LabeledInput
+                  label="Email address"
+                  icon={Mail}
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={setEmail}
+                  disabled={isFormDisabled}
+                />
+                <LabeledInput
+                  label="Password"
+                  icon={Lock}
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="At least 6 characters"
+                  value={password}
+                  onChange={setPassword}
+                  disabled={isFormDisabled}
+                />
+                <LabeledInput
+                  label="Confirm password"
+                  icon={Lock}
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Re-enter your password"
+                  value={confirmPassword}
+                  onChange={setConfirmPassword}
+                  disabled={isFormDisabled}
+                />
+                <ErrorBanner msg={error} />
+                <StatusBanner msg={status} />
+                <button className="primary-btn w-full" type="submit" disabled={isFormDisabled}>
+                  {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <UserRound className="h-4 w-4" />}
+                  {submitting ? 'Creating account…' : 'Create account'}
+                </button>
+              </form>
+            ) : null}
+
+            {mode === 'forgot' ? (
+              <form className="space-y-4" onSubmit={handleForgotPassword}>
+                <LabeledInput
+                  label="Email address"
+                  icon={Mail}
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={setEmail}
+                  disabled={isFormDisabled}
+                />
+                <ErrorBanner msg={error} />
+                <StatusBanner msg={status} />
+                <button className="primary-btn w-full" type="submit" disabled={isFormDisabled}>
+                  {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                  {submitting ? 'Sending reset link…' : 'Send reset link'}
+                </button>
+                <button
+                  type="button"
+                  className="w-full text-sm text-stone-500 transition hover:text-stone-700"
+                  onClick={() => {
+                    setMode('sign-in');
+                    resetFeedback();
+                  }}
+                >
+                  Back to sign in
+                </button>
+              </form>
+            ) : null}
+
+            {mode === 'reset' ? (
+              <form className="space-y-4" onSubmit={handleResetPassword}>
+                <LabeledInput
+                  label="New password"
+                  icon={Lock}
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="At least 6 characters"
+                  value={password}
+                  onChange={setPassword}
+                  disabled={isFormDisabled}
+                />
+                <LabeledInput
+                  label="Confirm password"
+                  icon={Lock}
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Re-enter your new password"
+                  value={confirmPassword}
+                  onChange={setConfirmPassword}
+                  disabled={isFormDisabled}
+                />
+                <ErrorBanner msg={error} />
+                <StatusBanner msg={status} />
+                <button className="primary-btn w-full" type="submit" disabled={isFormDisabled}>
+                  {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                  {submitting ? 'Saving password…' : 'Save new password'}
+                </button>
+              </form>
+            ) : null}
+
+            <div className="mt-5 rounded-[1.4rem] bg-stone-50/80 px-4 py-4 text-sm leading-6 text-stone-600">
+              Guests can still explore VoltShare without signing in — an account simply lets VoltShare remember your
+              avatar, display name, listings, purchases, and saved pricing history.
+            </div>
+          </section>
+        )}
       </div>
     </main>
   );
@@ -295,5 +462,43 @@ function FeaturePill({ icon: Icon, label }: { icon: typeof Wallet; label: string
         <span className="text-sm font-medium">{label}</span>
       </div>
     </div>
+  );
+}
+
+function LabeledInput({
+  label,
+  icon: Icon,
+  type,
+  autoComplete,
+  placeholder,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  icon: typeof Mail;
+  type: string;
+  autoComplete?: string;
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <label className="field-block">
+      <span className="field-label">{label}</span>
+      <div className="relative">
+        <Icon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
+        <input
+          className="input-control w-full pl-11"
+          type={type}
+          autoComplete={autoComplete}
+          placeholder={placeholder}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          disabled={disabled}
+        />
+      </div>
+    </label>
   );
 }

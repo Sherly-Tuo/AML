@@ -21,7 +21,7 @@ export default function Intro() {
               Trade clean energy<br />with your<br />neighbour.
             </h1>
             <p className="mt-3 text-sm leading-6 text-emerald-50/75 max-w-[17rem]">
-              Peer-to-peer renewable energy with algorithm-driven pricing.
+              Peer-to-peer renewable energy with algorithm-driven pricing, saved activity, and account-based profiles.
             </p>
             <div className="mt-5 flex gap-3">
               <FeaturePill icon={Sparkles} label="AI pricing" />
@@ -34,7 +34,7 @@ export default function Intro() {
         <div className="grid grid-cols-3 gap-3">
           <StatCard value="P2P" label="Direct trading" />
           <StatCard value="AI" label="Price optimiser" />
-          <StatCard value="Live" label="Weather-aware" />
+          <StatCard value="Sync" label="Profile + history" />
         </div>
 
         {/* CTAs */}

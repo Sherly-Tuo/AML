@@ -101,3 +101,19 @@ export interface Purchase {
   totalCost: number;
   boughtAt: string;
 }
+
+export interface CurrentWeatherSnapshot {
+  locationLabel: string;
+  temperatureC: number;
+  sunriseTime?: string;
+  sunsetTime?: string;
+}
+
+export interface AppEvent {
+  id: string;
+  eventName: string;
+  screen: string;
+  userId?: string | null;
+  metadata?: Record<string, string | number | boolean | null>;
+  createdAt: string;
+}

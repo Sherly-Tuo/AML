@@ -19,6 +19,37 @@ So the intended operational model is:
 3. the new rows are written into Supabase
 4. the app and dashboard automatically read the latest records
 
+## Product tables vs reference tables
+
+VoltShare now has two different database layers:
+
+### 1. Reference tables
+
+These are the AML / market context tables:
+
+- `demand_bids`
+- `supply_reports`
+- `recommendation_runs`
+
+They help explain how pricing is generated.
+
+### 2. Product tables
+
+These are the live marketplace tables:
+
+- `listings`
+- `transactions`
+
+They support the real app flow:
+
+- one user lists energy
+- another user sees it
+- another user buys it
+- the backend team later analyzes the trade
+
+The monthly update process mainly refreshes the reference tables.
+The product tables are written continuously by user actions in the app.
+
 ## Data sources to update
 
 ### 1. Demand-side data
