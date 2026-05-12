@@ -16,10 +16,7 @@ The full algorithm explanation, data pipeline, model evaluation metrics (OLS vs.
 
 ## What VoltShare is
 
-VoltShare is a peer-to-peer renewable energy trading prototype. The academic analysis (data pipeline, ML models, pricing algorithm) is presented in a standalone analytics page. Separately, we built an app demo to simulate how the ML pricing output would work inside a real user-facing marketplace.
-
-- **Analytics page** — for the professor: data pipeline, OLS + Random Forest demand modelling, grid-search pricing, model evaluation, and formula derivations.
-- **App demo** — a simulated product: list surplus solar energy at an ML-optimised price, browse and buy listings from neighbours, track activity and wallet balance.
+VoltShare is a peer-to-peer renewable energy trading prototype that uses OLS and Random Forest demand modelling with a grid-search price optimiser to recommend listing prices for surplus solar energy. We also built a simulated app to show how the ML pricing output would work inside a real marketplace — users can list surplus energy, browse neighbour listings, and track activity and wallet balance.
 
 The pricing algorithm uses:
 1. Hourly demand features from VIC1 market data (OLS + Random Forest)
