@@ -10,16 +10,16 @@
 
 Using Victoria (VIC1) electricity market data and Melbourne solar generation records, we build an OLS baseline and a Random Forest demand model, then run a grid-search price optimiser to show that ML-recommended prices outperform the FiT baseline in expected profit — with the largest gains during high-demand, low-supply hours. This has direct policy relevance: if P2P pricing incentives are strong enough, households are more likely to invest in rooftop solar and actively participate in local energy sharing.
 
-The full algorithm explanation, data pipeline, model evaluation metrics (OLS vs. Random Forest R², RMSE, MAE), and pricing formula derivations are in the **Analytics Dashboard** inside the demo app.
+The full algorithm explanation, data pipeline, model evaluation metrics (OLS vs. Random Forest R², RMSE, MAE), and pricing formula derivations are in the standalone analytics page linked below.
 
 ---
 
 ## What VoltShare is
 
-VoltShare is a peer-to-peer renewable energy trading prototype. It has two layers:
+VoltShare is a peer-to-peer renewable energy trading prototype. The academic analysis (data pipeline, ML models, pricing algorithm) is presented in a standalone analytics page. Separately, we built an app demo to simulate how the ML pricing output would work inside a real user-facing marketplace.
 
-- **Analytics Dashboard** — the academic layer: data pipeline, OLS + Random Forest demand modelling, grid-search pricing, model evaluation charts, and formula cards.
-- **App Demo** — a simulated user experience: list surplus solar energy at an ML-optimised price, browse and buy listings from neighbours, track activity and wallet balance.
+- **Analytics page** — for the professor: data pipeline, OLS + Random Forest demand modelling, grid-search pricing, model evaluation, and formula derivations.
+- **App demo** — a simulated product: list surplus solar energy at an ML-optimised price, browse and buy listings from neighbours, track activity and wallet balance.
 
 The pricing algorithm uses:
 1. Hourly demand features from VIC1 market data (OLS + Random Forest)
@@ -31,13 +31,12 @@ The pricing algorithm uses:
 
 ## Try the demo
 
-**Standalone analytics page (no server needed):** via GitHub Pages at `https://sherly-tuo.github.io/AML/analytics.html`
+**Standalone analytics page** (algorithm explanation, model evaluation, formula derivations): [https://sherly-tuo.github.io/AML/analytics.html](https://sherly-tuo.github.io/AML/analytics.html)
 
-**Live app:** https://aml-sandy.vercel.app
+**Live app demo:** https://aml-sandy.vercel.app
 
 1. Open the link → click **Enter demo** (no account needed)
-2. Choose **Analytics Dashboard** to see the full algorithm explanation, charts, and model evaluation
-3. Choose **Enter App** to try the product flow:
+2. Try the product flow:
    - **Sell** — enter your surplus kWh and listing hour → get an ML-optimised price recommendation
    - **Buy** — browse active listings from neighbours
    - **Activity** — view your pricing runs and purchase history
