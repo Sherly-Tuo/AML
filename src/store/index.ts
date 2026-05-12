@@ -4,7 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { defaultDemandBids } from '../data/vic1DemandBids';
 import { defaultSupplyReports } from '../data/solarSupplyReports';
 import { toHourStartIso, toIsoString } from '../lib/datetime';
-import type { AppEvent, DemandBid, MarketReport, OptimizationRun, Purchase } from '../types';
+import type { AppEvent, DemandBid, MarketReport, OptimizationRun, Purchase, WeatherHour } from '../types';
 
 interface NewMarketReport {
   reporterName: string;
@@ -54,6 +54,8 @@ interface AppState {
   clearPurchases: () => void;
   addAppEvent: (event: Omit<AppEvent, 'id' | 'createdAt'> & { id?: string; createdAt?: string }) => void;
   redeemPromoCode: (code: string) => { success: boolean; message: string; creditAdded?: number };
+  weatherHours: WeatherHour[];
+  setWeatherHours: (hours: WeatherHour[]) => void;
 }
 
 export const seedMarketReports: MarketReport[] = defaultSupplyReports;
@@ -131,6 +133,7 @@ export const useStore = create<AppState>()(
       appEvents: [],
       walletCredits: 0,
       redeemedCodes: [],
+      weatherHours: [],
 
       addMarketReport: (report) =>
         set((state) => ({
@@ -227,6 +230,8 @@ export const useStore = create<AppState>()(
             ...state.appEvents,
           ].slice(0, 120),
         })),
+
+      setWeatherHours: (hours) => set({ weatherHours: hours }),
 
       redeemPromoCode: (code) => {
         const normalized = code.trim().toUpperCase();

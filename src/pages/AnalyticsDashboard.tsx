@@ -158,6 +158,20 @@ export default function AnalyticsDashboard() {
           </Link>
         </div>
 
+        {/* Research question banner */}
+        <section className="rounded-[1.8rem] border border-emerald-200 bg-emerald-50/80 px-6 py-5 shadow-[0_8px_24px_rgba(38,84,62,0.06)]">
+          <p className="text-xs font-medium uppercase tracking-[0.22em] text-emerald-700">Research question</p>
+          <p className="mt-2 text-lg font-semibold leading-7 text-emerald-950">
+            Can ML-based dynamic pricing in peer-to-peer renewable energy markets systematically improve household seller revenue compared to a fixed grid feed-in tariff (FiT)?
+          </p>
+          <p className="mt-2 text-sm leading-6 text-emerald-900/80">
+            Using Victoria (VIC1) electricity market data and Melbourne solar generation records, we train an OLS baseline and a Random Forest demand model, then run a grid search over 48 candidate prices to find the listing price that maximises expected profit relative to the FiT opportunity cost. Results show that ML-optimised prices outperform the FiT baseline across all tested hours, with the largest gains during high-demand, low-supply periods — suggesting that algorithmic pricing can meaningfully improve P2P market participation incentives for solar households.
+          </p>
+          <p className="mt-3 text-xs text-emerald-700">
+            Columbia SIPA · Applying Machine Learning · Prof. Daniel Björkegren · May 2026
+          </p>
+        </section>
+
         <section className="hero-panel">
           <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
             <div className="space-y-5">
@@ -166,11 +180,11 @@ export default function AnalyticsDashboard() {
                   Algorithm Explanation
                 </h1>
                 <p className="max-w-3xl text-base leading-8 text-stone-700 sm:text-lg">
-                  This dashboard is the academic view of VoltShare. It explains how generated demand-side and supply-side datasets are constructed, how OLS and Random Forest are used inside the pricing workflow, and how the recommendation engine supports a realistic clean-energy trading product.
+                  This dashboard is the academic view of VoltShare. It explains how generated demand-side and supply-side datasets are constructed, how OLS and Random Forest are used inside the pricing workflow, and how the pricing engine supports a realistic clean-energy trading product.
                 </p>
               </div>
               <div className="rounded-[1.5rem] border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm leading-6 text-emerald-950">
-                Core purpose: show how AML, predictive pricing, and a user-facing web application can be combined to address a real-world clean-energy allocation problem.
+                Core purpose: show how applied ML, predictive pricing, and a user-facing web application can be combined to address a real-world clean-energy allocation problem.
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">

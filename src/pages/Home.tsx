@@ -66,6 +66,7 @@ function Home() {
   const resetDemandBids = useStore((state) => state.resetDemandBids);
   const saveOptimizationRun = useStore((state) => state.saveOptimizationRun);
   const clearOptimizationHistory = useStore((state) => state.clearOptimizationHistory);
+  const setWeatherHours = useStore((state) => state.setWeatherHours);
 
   const [reporterName, setReporterName] = useState('');
   const [reportKwh, setReportKwh] = useState('');
@@ -129,6 +130,7 @@ function Home() {
   const loadHistoricalWeather = async () => {
     if (!historicalWindow) {
       setHistoricalWeatherHours([]);
+      setWeatherHours([]);
       setSelectedHistoricalTime('');
       setWeatherStatus('');
       setWeatherError('There is no overlapping historical time window between the current supply and demand data.');
@@ -141,6 +143,7 @@ function Home() {
     try {
       const history = await fetchHistoricalWeather(historicalWindow);
       setHistoricalWeatherHours(history);
+      setWeatherHours(history);
       const aligned = alignHistoricalWeatherWithMarket(history, marketReports, demandBids);
       setSelectedHistoricalTime((current) =>
         current && aligned.some((hour) => hour.time === current) ? current : (aligned[0]?.time ?? ''),
@@ -150,6 +153,7 @@ function Home() {
       );
     } catch (error) {
       setHistoricalWeatherHours([]);
+      setWeatherHours([]);
       setWeatherError(error instanceof Error ? error.message : 'Failed to load weather data.');
       setWeatherStatus('');
     }

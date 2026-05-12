@@ -24,7 +24,7 @@ export default function Intro() {
               Peer-to-peer renewable energy with algorithm-driven pricing, saved activity, and account-based profiles.
             </p>
             <div className="mt-5 flex gap-3">
-              <FeaturePill icon={Sparkles} label="AI pricing" />
+              <FeaturePill icon={Sparkles} label="ML pricing" />
               <FeaturePill icon={ShieldCheck} label="Local flow" />
             </div>
           </div>
@@ -33,7 +33,7 @@ export default function Intro() {
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-3">
           <StatCard value="P2P" label="Direct trading" />
-          <StatCard value="AI" label="Price optimiser" />
+          <StatCard value="ML" label="Price optimiser" />
           <StatCard value="Sync" label="Profile + history" />
         </div>
 

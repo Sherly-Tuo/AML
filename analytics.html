@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VoltShare — Analytics Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'], serif: ['EB Garamond', 'serif'] }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background: linear-gradient(180deg,#f6fbf7 0%,#eff7f0 100%); min-height: 100vh; }
+    .formula { font-family: 'EB Garamond', serif; font-size: 1.05rem; line-height: 1.9; white-space: pre-wrap; }
+    .panel { background: rgba(255,255,255,0.88); border: 1px solid rgba(255,255,255,0.8); border-radius: 1.8rem; padding: 1.75rem; box-shadow: 0 18px 40px rgba(38,84,62,0.08); }
+    .eyebrow { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.22em; color: #6b7280; margin-bottom: 0.5rem; }
+    .formula-card { background: linear-gradient(150deg,rgba(255,254,249,0.98),rgba(253,247,233,0.92)); border: 1px solid rgba(251,191,36,0.25); border-radius: 1.5rem; padding: 1.25rem 1.5rem; }
+    .info-card { background: rgba(255,255,255,0.85); border: 1px solid rgba(255,255,255,0.8); border-radius: 1.5rem; padding: 1.25rem 1.5rem; box-shadow: 0 8px 24px rgba(109,84,35,0.06); }
+    .metric-card { background: rgba(255,255,255,0.9); border: 1px solid rgba(255,255,255,0.8); border-radius: 1.4rem; padding: 1.1rem 1.25rem; box-shadow: 0 10px 28px rgba(109,84,35,0.06); }
+    .tag { display: inline-block; background: #ecfdf5; color: #065f46; font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.18em; padding: 0.2rem 0.75rem; border-radius: 9999px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th { background: rgba(245,245,244,0.95); padding: 0.65rem 1rem; text-align: left; font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.18em; color: #6b7280; border-bottom: 1px solid rgba(231,229,228,0.7); }
+    td { padding: 0.7rem 1rem; border-bottom: 1px solid rgba(245,244,243,0.8); color: #44403c; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(250,250,249,0.6); }
+  </style>
+</head>
+<body class="font-sans text-stone-800 antialiased">
+<div class="mx-auto max-w-5xl px-4 py-10 space-y-8">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <span class="tag">VoltShare</span>
+    <span class="text-xs text-stone-400">Columbia SIPA · Applying Machine Learning · Prof. Daniel Björkegren · May 2026</span>
+  </div>
+
+  <!-- Research question -->
+  <section style="background:rgba(236,253,245,0.85);border:1px solid #a7f3d0;border-radius:1.8rem;padding:1.75rem 2rem;box-shadow:0 8px 24px rgba(38,84,62,0.06)">
+    <p class="eyebrow" style="color:#065f46">Research question</p>
+    <h1 class="mt-2 text-2xl font-semibold leading-8 text-emerald-950">
+      Can ML-based dynamic pricing in peer-to-peer renewable energy markets systematically improve household seller revenue compared to a fixed grid feed-in tariff (FiT)?
+    </h1>
+    <p class="mt-3 text-sm leading-7 text-emerald-900" style="opacity:0.85">
+      Using Victoria (VIC1) electricity market data and Melbourne solar generation records, we train an OLS baseline and a Random Forest demand model, then run a grid search over 48 candidate prices to find the listing price that maximises expected profit relative to the FiT opportunity cost. Our results show that ML-optimised prices outperform the FiT baseline in expected net revenue across all tested hours, with the largest gains during high-demand, low-supply periods — suggesting that algorithmic pricing can meaningfully improve P2P market participation incentives for rooftop solar households.
+    </p>
+    <p class="mt-4 text-xs" style="color:#059669">
+      <strong>Policy relevance:</strong> If P2P pricing incentives are large enough, households are more likely to invest in rooftop solar and actively share energy with neighbours — accelerating community-level clean energy adoption without central grid subsidy.
+    </p>
+  </section>
+
+  <!-- Introduction -->
+  <section class="panel space-y-4">
+    <div><p class="eyebrow">Part 0</p><h2 class="text-2xl font-semibold text-stone-950">Introduction</h2></div>
+    <p class="text-sm leading-7 text-stone-700">
+      Solar energy and decentralised clean-energy trading are becoming increasingly important as power systems shift away from centralised fossil-fuel dependence. Yet traditional electricity allocation remains inflexible: small-scale households can produce excess solar generation, but have limited ability to price, trade, or reallocate that energy efficiently within local communities.
+    </p>
+    <p class="text-sm leading-7 text-stone-700">
+      VoltShare addresses this gap by asking how applied machine learning can support smarter local energy exchange. It uses historical demand-side and supply-side data, hourly weather context, and predictive pricing logic to recommend a listing price for surplus renewable energy. The AML component combines an interpretable OLS baseline with a Random Forest comparison model, then evaluates candidate prices through an expected-revenue optimisation step.
+    </p>
+    <p class="text-sm leading-7 text-stone-700">
+      In parallel, we built a full-stack web application to simulate how these model outputs could function inside a real user-facing marketplace. The result is both an academic AML exercise and a product prototype at the intersection of climate technology, data science, and digital market design.
+    </p>
+    <div style="background:rgba(236,253,245,0.7);border:1px solid #a7f3d0;border-radius:1.25rem;padding:1rem 1.25rem;">
+      <p class="text-sm font-medium text-emerald-900">Core purpose: show how applied ML, predictive pricing, and a user-facing web application can be combined to address a real-world clean-energy allocation problem.</p>
+    </div>
+  </section>
+
+  <!-- Data pipeline -->
+  <section class="panel space-y-5">
+    <div>
+      <p class="eyebrow">Part 1</p>
+      <h2 class="text-2xl font-semibold text-stone-950">Data pipeline</h2>
+      <p class="mt-2 text-sm leading-7 text-stone-600">VoltShare does not read raw CSVs directly. Instead, it generates structured hourly databases, then joins them by timestamp before modelling and recommendation.</p>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-3">
+      <div class="info-card">
+        <p class="text-sm font-semibold text-stone-950 mb-2">Demand database</p>
+        <p class="text-sm leading-6 text-stone-600">VIC1 price-demand file → hourly normalised demand + buyer-side willingness-to-pay proxy. Used to train OLS and Random Forest.</p>
+        <p class="mt-2 text-xs text-stone-400">Source: AEMO price_and_demand_vic1.csv</p>
+      </div>
+      <div class="info-card">
+        <p class="text-sm font-semibold text-stone-950 mb-2">Supply database</p>
+        <p class="text-sm leading-6 text-stone-600">Quarter-hour solar generation → hourly household-scale surplus estimates + supply-side reference prices.</p>
+        <p class="mt-2 text-xs text-stone-400">Source: APVI Solar_Energy_Generation.csv</p>
+      </div>
+      <div class="info-card">
+        <p class="text-sm font-semibold text-stone-950 mb-2">Weather context</p>
+        <p class="text-sm leading-6 text-stone-600">Historical hourly weather (temperature, cloud cover, radiation, precipitation) aligned to Melbourne. Affects both demand and supply adjustments.</p>
+        <p class="mt-2 text-xs text-stone-400">Source: Open-Meteo archive API</p>
+      </div>
+    </div>
+
+    <div style="background:rgba(255,255,255,0.8);border:1px solid rgba(231,229,228,0.7);border-radius:1.5rem;padding:1.25rem 1.5rem;">
+      <p class="text-sm leading-7 text-stone-700"><strong>Pipeline:</strong> VIC1 rows → hourly demand bids → feature engineering → OLS + RF training → grid-search pricing → recommended listing price. The optimisation context joins time features, lag features, supply context, and weather context at the same hourly timestamp.</p>
+    </div>
+
+    <!-- Price spread chart -->
+    <div style="background:linear-gradient(150deg,rgba(255,254,249,0.98),rgba(253,247,233,0.90));border:1px solid rgba(251,191,36,0.25);border-radius:1.5rem;padding:1.5rem;">
+      <p class="eyebrow">Supply price vs demand bid — by hour of day</p>
+      <p class="text-sm text-stone-500 mb-4">The gap between these two lines is the pricing margin the algorithm navigates. When demand bids exceed supply price, there is room to raise the listing price.</p>
+      <canvas id="priceSpreadChart" height="80"></canvas>
+    </div>
+  </section>
+
+  <!-- Demand side -->
+  <section class="panel space-y-5">
+    <div>
+      <p class="eyebrow">Part 2</p>
+      <h2 class="text-2xl font-semibold text-stone-950">Demand side</h2>
+      <p class="mt-2 text-sm leading-7 text-stone-600">The demand side estimates buyer willingness to pay by transforming regional VIC1 data into hourly proxy bids. VIC1 is the Victorian regional electricity market identifier in the NEM.</p>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="formula-card">
+        <p class="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Demand quantity formula</p>
+        <p class="formula text-stone-800">Dₜ = mean(TOTALDEMANDₜ) / 1000</p>
+        <p class="mt-3 text-xs leading-5 text-stone-500">Average VIC1 demand within each hour, rescaled to household-level quantity.</p>
+      </div>
+      <div class="formula-card">
+        <p class="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Demand-side price proxy</p>
+        <p class="formula text-stone-800">Pₜ = clamp( Q₀.₉₀(RRPₜ⁺) / 1000 , 0.02 , 0.40 )</p>
+        <p class="mt-3 text-xs leading-5 text-stone-500">Upper-quantile positive RRP used as willingness-to-pay proxy. Unit converted from $/MWh to $/kWh.</p>
+      </div>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="formula-card">
+        <p class="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">OLS baseline (interpretable model)</p>
+        <p class="formula text-stone-800">log(Ďₜ) = β₀ + β₁pₜ + β₂hourSinₜ + β₃hourCosₜ
+       + β₄monthSinₜ + β₅monthCosₜ
+       + β₆lagDemand1ₜ + β₇lagDemand24ₜ
+       + β₈lagPrice1ₜ + ...</p>
+        <p class="mt-3 text-xs leading-5 text-stone-500">OLS predicts log(demand) using price, cyclical time encodings, and lag features. Interpretable baseline for the coursework.</p>
+      </div>
+      <div class="formula-card">
+        <p class="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Random Forest (nonlinear extension)</p>
+        <p class="formula text-stone-800">Ďₜ = f( pₜ, hourₜ, monthₜ, dayOfWeekₜ,
+        lagDemand1ₜ, lagDemand24ₜ,
+        lagPrice1ₜ, rollingDemand24ₜ,
+        logPrice_x_hourSinₜ, weatherₜ, ... )</p>
+        <p class="mt-3 text-xs leading-5 text-stone-500">Random Forest captures nonlinear interactions (e.g. price × time-of-day) that OLS cannot express linearly.</p>
+      </div>
+    </div>
+
+    <!-- Hourly demand chart -->
+    <div style="background:linear-gradient(150deg,rgba(255,254,249,0.98),rgba(253,247,233,0.90));border:1px solid rgba(251,191,36,0.25);border-radius:1.5rem;padding:1.5rem;">
+      <p class="eyebrow">Average demand by hour of day</p>
+      <p class="text-sm text-stone-500 mb-4">Shows when buyer-side pressure peaks — the model learns this intraday pattern from lag and rolling features.</p>
+      <canvas id="hourlyDemandChart" height="80"></canvas>
+    </div>
+
+    <div class="info-card">
+      <p class="text-sm font-semibold text-stone-950 mb-2">Feature engineering</p>
+      <p class="text-sm leading-6 text-stone-600">
+        <strong>Time features:</strong> sin/cos encodings of hour (24h cycle) and month (12-month cycle), plus weekend indicator.<br>
+        <strong>Lag features:</strong> lagDemand1, lagDemand24, lagPrice1, lagPrice24 (1-hour and 1-day lags).<br>
+        <strong>Rolling features:</strong> 24-hour rolling mean of demand and price.<br>
+        <strong>Interaction features (RF only):</strong> logPrice × hourSin, logPrice × hourCos, lagDemandDelta, lagPriceDelta.
+      </p>
+    </div>
+  </section>
+
+  <!-- Supply side -->
+  <section class="panel space-y-5">
+    <div>
+      <p class="eyebrow">Part 3</p>
+      <h2 class="text-2xl font-semibold text-stone-950">Supply side</h2>
+      <p class="mt-2 text-sm leading-7 text-stone-600">The supply side approximates what a typical household could list by aggregating multi-site solar generation into hourly surplus reference quotes.</p>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="formula-card">
+        <p class="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Site-hour generation</p>
+        <p class="formula text-stone-800">G₍s,t₎ = Σⱼ max( SolarGeneration₍s,t,j₎ , 0 )</p>
+        <p class="mt-3 text-xs leading-5 text-stone-500">Sum of positive quarter-hour solar generation per site per hour. Only positive generation retained.</p>
+      </div>
+      <div class="formula-card">
+        <p class="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Household surplus proxy</p>
+        <p class="formula text-stone-800">Sₜ = medianₛ( G₍s,t₎ ) / 4</p>
+        <p class="mt-3 text-xs leading-5 text-stone-500">Hourly median across active sites, divided by 4 to scale from fleet-level to typical household surplus.</p>
+      </div>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="formula-card">
+        <p class="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Supply-side price reference</p>
+        <p class="formula text-stone-800">Priceₜ = 0.19 − normalizedAbundanceₜ × 0.07
+  clamped to [0.11, 0.19]</p>
+        <p class="mt-3 text-xs leading-5 text-stone-500">Inversely mapped from hourly abundance: higher surplus → lower reference price; tighter supply → higher price.</p>
+      </div>
+      <div class="formula-card">
+        <p class="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Weather-aware supply adjustment</p>
+        <p class="formula text-stone-800">ΔSₜ = clamp(
+  (radiationₜ − 240)·0.0026
+  + (DNIₜ − 300)·0.0014
+  − cloudₜ·0.018 − rainₜ·0.55
+  + nightPenalty ,
+  −0.9Sₜ , 0.9Sₜ )</p>
+        <p class="mt-3 text-xs leading-5 text-stone-500">Radiation lifts available supply; cloud, rain, and night-time conditions reduce it.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Model performance -->
+  <section class="panel space-y-5">
+    <div>
+      <p class="eyebrow">Part 4</p>
+      <h2 class="text-2xl font-semibold text-stone-950">Model evaluation</h2>
+      <p class="mt-2 text-sm leading-7 text-stone-600">Both models use forward time-split (train/validation/test at 70%/80%/100%). No random shuffling — order preserved.</p>
+    </div>
+
+    <!-- Metrics table -->
+    <div style="border-radius:1.5rem;overflow:hidden;border:1px solid rgba(231,229,228,0.7);box-shadow:0 8px 24px rgba(109,84,35,0.05)">
+      <table>
+        <thead>
+          <tr>
+            <th>Model</th><th>RMSE ↓</th><th>MAE ↓</th><th>R² ↑</th><th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="font-semibold">OLS baseline</td>
+            <td>0.3405</td><td>0.2211</td><td>0.8990</td>
+            <td class="text-stone-500">Linear, log(demand) target. Interpretable β coefficients.</td>
+          </tr>
+          <tr>
+            <td class="font-semibold">RF (no weather)</td>
+            <td>0.2892</td><td>0.1798</td><td>0.9272</td>
+            <td class="text-stone-500">200 trees, max_depth=12. Temporal + lag features only.</td>
+          </tr>
+          <tr>
+            <td class="font-semibold">RF (with weather)</td>
+            <td>0.2933</td><td>0.1822</td><td>0.9251</td>
+            <td class="text-stone-500">+6 weather features. <em>Did not improve</em> over no-weather RF.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="background:#fef9c3;border:1px solid #fde047;border-radius:1.25rem;padding:1rem 1.25rem;">
+      <p class="text-sm text-yellow-900"><strong>Weather ablation finding:</strong> Adding Melbourne historical weather did <em>not</em> significantly improve test-set accuracy (RF with weather: R²=0.9251 vs without: R²=0.9272). This suggests the current demand signal is already well-explained by temporal and lag features. A single-location weather proxy may be too coarse for a regional (VIC1) demand series — a direction for future work.</p>
+    </div>
+
+    <!-- Model comparison chart -->
+    <div style="background:rgba(255,255,255,0.9);border:1px solid rgba(231,229,228,0.7);border-radius:1.5rem;padding:1.5rem;">
+      <p class="eyebrow">OLS vs Random Forest — RMSE and R² comparison</p>
+      <canvas id="modelCompareChart" height="70"></canvas>
+    </div>
+  </section>
+
+  <!-- Pricing optimisation -->
+  <section class="panel space-y-5">
+    <div>
+      <p class="eyebrow">Part 5</p>
+      <h2 class="text-2xl font-semibold text-stone-950">Grid-search price optimisation</h2>
+      <p class="mt-2 text-sm leading-7 text-stone-600">Rather than outputting a single market price, VoltShare evaluates 48 candidate prices and selects the one with the highest expected net profit.</p>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="formula-card">
+        <p class="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">FiT opportunity cost proxy</p>
+        <p class="formula text-stone-800">FiTₜ = clamp( Q₀.₁₅(supply pricesₜ) , 0.02 , 0.30 )</p>
+        <p class="mt-3 text-xs leading-5 text-stone-500">The 15th percentile of nearby supply prices acts as the floor: the cost of using P2P rather than grid feed-in tariff.</p>
+      </div>
+      <div class="formula-card">
+        <p class="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Retail tariff proxy (shortfall penalty)</p>
+        <p class="formula text-stone-800">Retailₜ = clamp( max(Q₀.₈₅(demand bidsₜ), FiTₜ + 0.03) ,
+              FiTₜ + 0.03 , 0.45 )</p>
+        <p class="mt-3 text-xs leading-5 text-stone-500">Buyer's outside option: if P2P price exceeds this, they buy from the grid instead.</p>
+      </div>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="formula-card">
+        <p class="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Market share (logistic response)</p>
+        <p class="formula text-stone-800">shareₜ(p) = 1 / (1 + exp( k · (p − midpoint) ))
+
+where midpoint = (FiT + Retail) / 2
+      k = 8 / (Retail − FiT)</p>
+        <p class="mt-3 text-xs leading-5 text-stone-500">Low price → high buyer share; price ≥ retail tariff → 0% share. Reflects price-sensitive buyer behaviour.</p>
+      </div>
+      <div class="formula-card">
+        <p class="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Expected profit per scenario</p>
+        <p class="formula text-stone-800">profit = ownSupplyUsed · (p − FiT)
+       − shortfall · max(Retail − p, 0)
+
+p* = argmaxₚ E[profit]</p>
+        <p class="mt-3 text-xs leading-5 text-stone-500">Averaged over demand and supply residual samples. The price maximising expected profit is recommended.</p>
+      </div>
+    </div>
+
+    <!-- Revenue curve chart -->
+    <div style="background:linear-gradient(150deg,rgba(251,255,252,0.98),rgba(236,253,245,0.88));border:1px solid #a7f3d0;border-radius:1.5rem;padding:1.5rem;">
+      <p class="eyebrow">Grid search — expected profit across candidate prices (illustrative)</p>
+      <p class="text-sm text-stone-500 mb-4">The algorithm evaluates each candidate price and selects the peak. The orange line marks FiT (floor); the red dashed line marks the retail tariff (ceiling).</p>
+      <canvas id="revenueCurveChart" height="80"></canvas>
+    </div>
+  </section>
+
+  <!-- Limitations & findings -->
+  <section class="panel space-y-5">
+    <div>
+      <p class="eyebrow">Part 6</p>
+      <h2 class="text-2xl font-semibold text-stone-950">Key findings &amp; limitations</h2>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="info-card">
+        <p class="text-sm font-semibold text-stone-950 mb-2">Key findings</p>
+        <ul class="text-sm leading-7 text-stone-600 space-y-1 list-disc list-inside">
+          <li>Random Forest outperforms OLS across all metrics (R² 0.927 vs 0.899)</li>
+          <li>ML-optimised prices consistently exceed FiT baseline in expected net revenue</li>
+          <li>Price gains are largest during high-demand, low-supply hours (evening peaks)</li>
+          <li>Temporal and lag features dominate demand prediction; weather adds little</li>
+          <li>Grid-search pricing provides a principled, interpretable optimisation step</li>
+        </ul>
+      </div>
+      <div class="info-card">
+        <p class="text-sm font-semibold text-stone-950 mb-2">Limitations</p>
+        <ul class="text-sm leading-7 text-stone-600 space-y-1 list-disc list-inside">
+          <li>VIC1 is regional market data, not real household P2P bids</li>
+          <li>Weather proxy is a single Melbourne location — too coarse for regional series</li>
+          <li>No postcode/meter-level validation of trading eligibility</li>
+          <li>Supply proxy from fleet solar, not individual rooftop meters</li>
+          <li>All prices and profits are simulated, not real transactions</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="background:rgba(236,253,245,0.7);border:1px solid #a7f3d0;border-radius:1.25rem;padding:1.1rem 1.4rem;">
+      <p class="text-sm text-emerald-900"><strong>Policy implication:</strong> If dynamic pricing via ML increases expected seller revenue by even a modest margin, it lowers the break-even threshold for rooftop solar investment — creating a market-based incentive for households to participate in local clean energy sharing without requiring new grid infrastructure or government subsidy.</p>
+    </div>
+  </section>
+
+  <!-- Backend layer -->
+  <section class="panel space-y-5">
+    <div>
+      <p class="eyebrow">Part 7</p>
+      <h2 class="text-2xl font-semibold text-stone-950">Product demo &amp; backend</h2>
+      <p class="mt-2 text-sm leading-7 text-stone-600">In addition to the academic ML pipeline, we built a full-stack web app to simulate how these outputs would function inside a real marketplace.</p>
+    </div>
+
+    <div style="border-radius:1.5rem;overflow:hidden;border:1px solid rgba(231,229,228,0.7);box-shadow:0 8px 24px rgba(109,84,35,0.05)">
+      <table>
+        <thead>
+          <tr><th>Product layer</th><th>What is stored</th><th>Why it matters</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="font-semibold">Auth &amp; profiles</td><td>Display name, saved history</td><td>Persistent user identity across sessions</td></tr>
+          <tr><td class="font-semibold">Listings &amp; transactions</td><td>Seller listings, buyer purchases, trade status</td><td>Simulates real two-sided marketplace behaviour</td></tr>
+          <tr><td class="font-semibold">Recommendation history</td><td>ML pricing outputs per user per hour</td><td>Tracks model outputs for future comparison and retraining</td></tr>
+          <tr><td class="font-semibold">Wallet &amp; credits</td><td>Balance, promo-code redemption</td><td>Simulates payment flow and user incentive mechanics</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-3">
+      <div class="metric-card text-center">
+        <p class="eyebrow">Tech stack</p>
+        <p class="text-sm font-semibold text-stone-950">Vite + React + TypeScript</p>
+        <p class="text-xs text-stone-500 mt-1">Tailwind CSS + Zustand + Supabase</p>
+      </div>
+      <div class="metric-card text-center">
+        <p class="eyebrow">ML notebook</p>
+        <p class="text-sm font-semibold text-stone-950">Python · scikit-learn</p>
+        <p class="text-xs text-stone-500 mt-1">OLS (statsmodels) + Random Forest</p>
+      </div>
+      <div class="metric-card text-center">
+        <p class="eyebrow">Demo</p>
+        <p class="text-sm font-semibold text-stone-950">aml-sandy.vercel.app</p>
+        <p class="text-xs text-stone-500 mt-1">No login required to explore</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="text-center text-xs text-stone-400 py-6 space-y-1">
+    <p>VoltShare · Columbia SIPA · Applying Machine Learning · Prof. Daniel Björkegren · May 2026</p>
+    <p>Source: <a href="https://github.com/Sherly-Tuo/AML" class="underline hover:text-stone-600">github.com/Sherly-Tuo/AML</a> · Live demo: <a href="https://aml-sandy.vercel.app" class="underline hover:text-stone-600">aml-sandy.vercel.app</a></p>
+  </footer>
+
+</div>
+
+<script>
+const HOURS = Array.from({length:24}, (_,i) => `${String(i).padStart(2,'0')}:00`);
+
+// Price spread chart
+new Chart(document.getElementById('priceSpreadChart'), {
+  type: 'line',
+  data: {
+    labels: HOURS,
+    datasets: [
+      {
+        label: 'Demand bid ($/kWh)',
+        data: [0.170,0.168,0.166,0.165,0.165,0.167,0.173,0.180,0.187,0.185,0.181,0.177,0.175,0.176,0.178,0.181,0.185,0.192,0.198,0.195,0.189,0.184,0.179,0.174],
+        borderColor: '#059669', backgroundColor: 'rgba(5,150,105,0.08)', tension: 0.4, borderWidth: 2, pointRadius: 2
+      },
+      {
+        label: 'Supply price ($/kWh)',
+        data: [0.162,0.161,0.160,0.159,0.159,0.160,0.163,0.165,0.167,0.165,0.163,0.161,0.160,0.161,0.162,0.163,0.165,0.168,0.171,0.169,0.166,0.164,0.163,0.162],
+        borderColor: '#d97706', backgroundColor: 'rgba(217,119,6,0.06)', tension: 0.4, borderWidth: 2, pointRadius: 2, borderDash: [5,3]
+      }
+    ]
+  },
+  options: {
+    responsive: true, plugins: { legend: { position: 'top' } },
+    scales: { y: { ticks: { callback: v => `$${v.toFixed(3)}` }, grid: { color: 'rgba(0,0,0,0.05)' } }, x: { grid: { color: 'rgba(0,0,0,0.04)' } } }
+  }
+});
+
+// Hourly demand chart
+new Chart(document.getElementById('hourlyDemandChart'), {
+  type: 'bar',
+  data: {
+    labels: HOURS,
+    datasets: [{
+      label: 'Avg demand (kWh)',
+      data: [0.18,0.16,0.15,0.14,0.14,0.15,0.19,0.25,0.29,0.30,0.29,0.27,0.26,0.25,0.25,0.27,0.29,0.32,0.35,0.33,0.30,0.27,0.24,0.21],
+      backgroundColor: 'rgba(5,150,105,0.55)', borderColor: '#059669', borderWidth: 1, borderRadius: 4
+    }]
+  },
+  options: {
+    responsive: true, plugins: { legend: { display: false } },
+    scales: { y: { ticks: { callback: v => `${v.toFixed(2)} kWh` }, grid: { color: 'rgba(0,0,0,0.05)' } }, x: { grid: { display: false } } }
+  }
+});
+
+// Model comparison chart
+new Chart(document.getElementById('modelCompareChart'), {
+  type: 'bar',
+  data: {
+    labels: ['OLS Baseline', 'RF (no weather)', 'RF (with weather)'],
+    datasets: [
+      { label: 'RMSE (lower is better)', data: [0.3405, 0.2892, 0.2933], backgroundColor: 'rgba(239,68,68,0.55)', borderColor: '#ef4444', borderWidth: 1, borderRadius: 4 },
+      { label: 'MAE (lower is better)',  data: [0.2211, 0.1798, 0.1822], backgroundColor: 'rgba(245,158,11,0.55)', borderColor: '#f59e0b', borderWidth: 1, borderRadius: 4 },
+      { label: 'R² (higher is better)',  data: [0.8990, 0.9272, 0.9251], backgroundColor: 'rgba(5,150,105,0.55)',  borderColor: '#059669', borderWidth: 1, borderRadius: 4 }
+    ]
+  },
+  options: {
+    responsive: true, plugins: { legend: { position: 'top' } },
+    scales: { y: { min: 0, max: 1.05, grid: { color: 'rgba(0,0,0,0.05)' } }, x: { grid: { display: false } } }
+  }
+});
+
+// Revenue curve chart
+const prices = [0.06,0.08,0.10,0.12,0.14,0.16,0.18,0.20,0.22,0.24,0.26,0.28,0.30,0.32,0.34];
+const profit  = [-0.14,-0.04,0.12,0.27,0.40,0.50,0.57,0.60,0.57,0.49,0.37,0.21,0.08,-0.03,-0.09];
+new Chart(document.getElementById('revenueCurveChart'), {
+  type: 'line',
+  data: {
+    labels: prices.map(p => `$${p.toFixed(2)}`),
+    datasets: [
+      {
+        label: 'Expected profit ($)',
+        data: profit,
+        borderColor: '#059669', backgroundColor: 'rgba(5,150,105,0.10)',
+        tension: 0.4, borderWidth: 2.5, pointRadius: 3, fill: true
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      annotation: { /* requires plugin */ }
+    },
+    scales: {
+      y: { ticks: { callback: v => `$${v.toFixed(2)}` }, grid: { color: 'rgba(0,0,0,0.05)' } },
+      x: { title: { display: true, text: 'Candidate listing price ($/kWh)' }, grid: { color: 'rgba(0,0,0,0.04)' } }
+    }
+  }
+});
+</script>
+</body>
+</html>

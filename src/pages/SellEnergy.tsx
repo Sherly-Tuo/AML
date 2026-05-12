@@ -22,6 +22,7 @@ export default function SellEnergy() {
   const demandBids = useStore((state) => state.demandBids);
   const addMarketReport = useStore((state) => state.addMarketReport);
   const saveOptimizationRun = useStore((state) => state.saveOptimizationRun);
+  const weatherHours = useStore((state) => state.weatherHours);
 
   const [surplusKwh, setSurplusKwh] = useState('5.5');
   const [targetPrice, setTargetPrice] = useState('0.18');
@@ -65,7 +66,7 @@ export default function SellEnergy() {
       },
       marketReports,
       demandBids,
-      [],
+      weatherHours,
     );
 
     setRecommendation(result);
@@ -224,6 +225,11 @@ export default function SellEnergy() {
           <h3 className="mt-2 text-3xl font-semibold tracking-tight text-stone-950">
             {recommendation.optimizedPrice.toFixed(3)}/kWh
           </h3>
+          {!recommendation.usedDemandSide && (
+            <div className="mt-3 rounded-[1.2rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              No demand-side data available — price is based on your input, not the ML model. Import demand bids in the Analytics tab to enable full optimisation.
+            </div>
+          )}
           <p className="mt-2 text-sm leading-6 text-stone-600">{recommendation.weatherSummary || recommendation.explanation[0]}</p>
 
           <div className="mt-4 grid grid-cols-2 gap-3">
