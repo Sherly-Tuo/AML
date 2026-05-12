@@ -69,7 +69,7 @@ VITE_SUPABASE_ANON_KEY=...
 The full Python ML pipeline (OLS, Random Forest, weather ablation, grid-search pricing) is in:
 
 ```
-notebooks（ml代码看这个）/voltshare_pricing_ml.ipynb
+notebooks/voltshare_pricing_ml.ipynb
 ```
 
 Requirements: `scikit-learn`, `pandas`, `numpy`, `statsmodels`, `matplotlib` (auto-installed on first run).
@@ -99,7 +99,7 @@ src/
   data/
     vic1DemandBids.ts        # Pre-processed VIC1 hourly demand bids
     solarSupplyReports.ts    # Pre-processed hourly solar supply reference
-notebooks（ml代码看这个）/
+notebooks/
   voltshare_pricing_ml.ipynb # Full Python ML pipeline
 ```
 
