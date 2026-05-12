@@ -31,7 +31,7 @@ The pricing algorithm uses:
 
 ## Try the demo
 
-**Standalone analytics page (no server needed):** [`analytics.html`](analytics.html) — open directly in any browser, or via GitHub Pages at `https://sherly-tuo.github.io/AML/analytics.html`
+**Standalone analytics page (no server needed):** via GitHub Pages at `https://sherly-tuo.github.io/AML/analytics.html`
 
 **Live app:** https://aml-sandy.vercel.app
 
