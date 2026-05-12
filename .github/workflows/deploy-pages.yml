@@ -35,6 +35,9 @@ jobs:
           VITE_BASE_PATH: /AML/
         run: npm run build
 
+      - name: Copy analytics dashboard
+        run: cp analytics.html ./dist/analytics.html
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
